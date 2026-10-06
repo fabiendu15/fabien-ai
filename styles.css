@@ -94,3 +94,16 @@
   .orbWrap.resting .orbLabel{font-size:9px;width:76px}
   .orbWrap.resting{width:76px}
 }
+
+
+/* Optimiseur = vraie conversation */
+.optimizerCard{display:flex;flex-direction:column;max-height:90vh}
+.optimizerHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.optimizerPresence{font-size:11px;color:#9bf0cb;display:flex;align-items:center;gap:6px;padding-top:5px}
+.optimizerPresence span{width:8px;height:8px;border-radius:50%;background:#35e9a0;box-shadow:0 0 10px #35e9a0}
+.optimizerChatLabel{font-size:11px;font-weight:800;color:#9db2ca;margin-top:14px}
+.optimizerChat{flex:1;min-height:280px;height:42vh;max-height:none}
+.optimizerWelcome{align-self:flex-start;max-width:78%;background:#0d3b32;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;color:#dcefe8}
+.optimizerComposer{position:sticky;bottom:0;background:#0c1828;padding-top:10px}
+.optimizerComposer .optimizerInput{min-height:58px;max-height:110px}
+.optimizerActions{margin-top:8px;padding-top:8px;border-top:1px solid #1c314a}
