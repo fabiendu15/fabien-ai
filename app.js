@@ -55,20 +55,35 @@ function renderConversationModal(){
   $("conversationChief").innerHTML=internal.length?internal.map(x=>`<div class="msg internal"><div class="who">${esc(AGENTS[x.from]?.name||x.from)} → ${esc(AGENTS[x.to]?.name||x.to)} · ${fmt(x.time)}</div>${esc(x.body)}</div>`).join(""):'<div class="empty">Aucun échange avec le réseau IA pour le moment.</div>';
 }
 function openConversation(){$("conversationModal").classList.remove("hidden");renderConversationModal()}
+function renderOptimizerChat(){
+  const wrap=$("optimizerChat");
+  if(!wrap)return;
+  const history=db.optimizer||[];
+  wrap.innerHTML=history.length?history.map(x=>`<div class="msg ${x.role==="Fabien"?"me":"agent"}"><div class="who">${esc(x.role)} · ${fmt(x.time)}</div>${esc(x.text)}</div>`).join(""):'<div class="empty">Parle-lui comme à une vraie IA. L’historique restera ici.</div>';
+  wrap.scrollTop=wrap.scrollHeight;
+}
+
 async function runOptimizer(){
-  const input=$("optimizerInput").value.trim()||"Analyse Fabien AI et propose les améliorations les plus utiles pour le rendre plus simple et plus efficace.";
-  $("runOptimizer").disabled=true;$("runOptimizer").textContent="Analyse…";$("optimizerOutput").textContent="L’Optimiseur analyse uniquement le site…";
+  const input=$("optimizerInput").value.trim();
+  if(!input)return;
+  $("optimizerInput").value="";
+  db.optimizer=db.optimizer||[];
+  db.optimizer.push({role:"Fabien",text:input,time:now()});
+  save();renderOptimizerChat();
+  $("runOptimizer").disabled=true;$("runOptimizer").textContent="…";
   try{
-    const history=(db.optimizer||[]).slice(-6).map(x=>`${x.role}: ${x.text}`).join("\n");
+    const history=db.optimizer.slice(-14).map(x=>`${x.role}: ${x.text}`).join("\n");
     const answer=await llm(
-      "Tu es l’Optimiseur UX/UI exclusif de Fabien AI. Tu ne travailles sur aucun projet métier. Tu dois rendre ce site plus simple, plus clair, plus rapide et plus agréable. Priorise la lisibilité des discussions, la compréhension immédiate, la réduction du nombre de clics et un design sobre. Ne propose pas une fonctionnalité juste parce qu’elle est jolie. Pour chaque proposition, explique le gain concret. Termine par TOP 3 À FAIRE EN PREMIER.",
-      `${SITE_BLUEPRINT}\n\nHISTORIQUE DES DEMANDES D’OPTIMISATION:\n${history||"Aucun"}\n\nDEMANDE DE FABIEN:\n${input}\n\nRéponds avec : 1) Ce qui gêne, 2) Modifications proposées, 3) Ce qui peut être supprimé/simplifié, 4) TOP 3 À FAIRE EN PREMIER.`,
-      700
+      "Tu es l’Optimiseur UX/UI exclusif de Fabien AI. Tu ne travailles sur aucun projet métier. Tu discutes avec Fabien comme dans une vraie conversation. Ton seul rôle est d’améliorer ce site : simplicité, design, lisibilité des discussions, navigation, efficacité et compréhension. Tiens compte de toute la conversation précédente. Pose une question si nécessaire. Donne des propositions concrètes et courtes.",
+      `${SITE_BLUEPRINT}\n\nCONVERSATION AVEC FABIEN:\n${history}\n\nRéponds au dernier message de Fabien de manière naturelle.`,
+      650
     );
-    db.optimizer.push({role:"Fabien",text:input,time:now()},{role:"Optimiseur",text:answer,time:now()});db.optimizer=db.optimizer.slice(-30);save();
-    $("optimizerOutput").textContent=answer;
-  }catch(e){$("optimizerOutput").textContent="Erreur locale : "+(e?.message||e)}
-  finally{$("runOptimizer").disabled=false;$("runOptimizer").textContent="Analyser le site"}
+    db.optimizer.push({role:"Optimiseur",text:answer,time:now()});save();renderOptimizerChat();
+  }catch(e){
+    db.optimizer.push({role:"Optimiseur",text:"Erreur locale : "+(e?.message||e),time:now()});save();renderOptimizerChat();
+  }finally{
+    $("runOptimizer").disabled=false;$("runOptimizer").textContent="Envoyer";$("optimizerInput").focus();
+  }
 }
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
 function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderReport()}
@@ -100,10 +115,10 @@ $("historyFocus").onclick=()=>openConversation();
 document.querySelectorAll("[data-open-chat]").forEach(b=>b.onclick=openConversation);
 $("closeConversation").onclick=()=>$("conversationModal").classList.add("hidden");$("conversationModal").onclick=e=>{if(e.target===$("conversationModal"))$("conversationModal").classList.add("hidden")};
 $("copyReport").onclick=async()=>{try{await navigator.clipboard.writeText($("reportText").textContent);$("copyReport").textContent="Copié ✓";setTimeout(()=>$("copyReport").textContent="Copier",1200)}catch{}};
-$("optimizerBtn").onclick=()=>{$("optimizerModal").classList.remove("hidden");$("optimizerInput").focus()};
+$("optimizerBtn").onclick=()=>{$("optimizerModal").classList.remove("hidden");renderOptimizerChat();$("optimizerInput").focus()};
 $("closeOptimizer").onclick=()=>$("optimizerModal").classList.add("hidden");$("optimizerModal").onclick=e=>{if(e.target===$("optimizerModal"))$("optimizerModal").classList.add("hidden")};
-document.querySelectorAll(".optQuick").forEach(b=>b.onclick=()=>{$("optimizerInput").value=b.dataset.opt;$("optimizerInput").focus()});
-$("runOptimizer").onclick=runOptimizer;
+document.querySelectorAll(".optQuick").forEach(b=>b.onclick=()=>{$("optimizerInput").value=b.dataset.opt;runOptimizer()});
+$("runOptimizer").onclick=runOptimizer;$("optimizerInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();runOptimizer()}});$("clearOptimizerChat").onclick=()=>{if(confirm("Effacer la conversation avec l’Optimiseur ?")){db.optimizer=[];save();renderOptimizerChat()}};
 $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("closePrivacy").onclick=()=>$("privacyModal").classList.add("hidden");$("privacyModal").onclick=e=>{if(e.target===$("privacyModal"))$("privacyModal").classList.add("hidden")};
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
