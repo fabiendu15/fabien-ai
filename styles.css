@@ -50,3 +50,47 @@
 .optimizerComposer .optimizerInput{min-height:74px;max-height:150px;margin:0}
 .optimizerComposer .primary{height:44px}
 @media(max-width:760px){.optimizerComposer{grid-template-columns:1fr}.optimizerComposer .primary{width:100%}.optimizerChat{height:45vh}}
+
+
+/* Salle des agents v2 — évite les superpositions */
+.zone.rest{right:3%;bottom:5%;width:46%;height:35%}
+.zone.block{left:3%;bottom:5%;width:35%;height:31%}
+.zone.work{left:3%;top:10%;width:43%;height:33%}
+.zone.wait{right:3%;top:8%;width:39%;height:28%}
+
+.orbWrap.resting{
+  width:86px;
+  height:70px;
+}
+.orbWrap.resting .orb{
+  left:22px;
+  top:2px;
+  width:38px;
+  height:38px;
+}
+.orbWrap.resting .orbLabel{
+  left:-2px;
+  top:44px;
+  width:86px;
+  text-align:center;
+  white-space:normal;
+  line-height:1.05;
+  font-size:10px;
+  overflow-wrap:anywhere;
+}
+.orbWrap.resting .orbStatus{
+  display:none;
+}
+.orbWrap.resting.selected .orb{
+  outline:2px solid white;
+  outline-offset:4px;
+}
+.orbWrap.waiting .orbLabel,
+.orbWrap.blocked .orbLabel,
+.orbWrap.working .orbLabel{
+  font-size:11px;
+}
+@media(max-width:1250px){
+  .orbWrap.resting .orbLabel{font-size:9px;width:76px}
+  .orbWrap.resting{width:76px}
+}
