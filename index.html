@@ -49,7 +49,7 @@
 <div class="lower">
 <section class="panel lowerPanel"><div class="panelTitle">Activité en temps réel</div><div id="activityList" class="activityList"><div class="empty">Aucune activité.</div></div></section>
 <section id="directPanel" class="panel lowerPanel"><div class="panelTitle"><span id="directTitle">Parler au Chef</span><span class="panelActions"><span id="directOnline" class="tiny">● disponible</span><button class="chatExpand" data-open-chat="direct">⤢ Agrandir</button></span></div><div id="directChat" class="chatBody"></div><div class="chatInput"><input id="directInput" placeholder="Écrire un message..."><button id="sendDirect">➤</button></div></section>
-<section id="chiefPanel" class="panel lowerPanel"><div class="panelTitle"><span>Discussion avec le chef</span><button class="chatExpand" data-open-chat="chief">⤢ Agrandir</button></div><div id="chiefChat" class="chatBody"></div></section>
+<section id="chiefPanel" class="panel lowerPanel"><div class="panelTitle"><span>🔗 Réseau IA</span><button class="chatExpand" data-open-chat="network">⤢ Agrandir</button></div><div id="chiefChat" class="chatBody"></div></section>
 </div>
 <section class="panel report"><div class="panelTitle"><span>Rapport final</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
 </main></div>
@@ -74,10 +74,10 @@
   <div id="conversationModal" class="modal hidden">
     <div class="modalCard conversationCard">
       <button id="closeConversation" class="modalClose">×</button>
-      <div class="conversationHeader"><div><div class="optimizerBadge">DISCUSSIONS</div><h2 id="conversationTitle">Architecture</h2></div><span class="tiny">Conversation complète de l’agent sélectionné</span></div>
+      <div class="conversationHeader"><div><div class="optimizerBadge">DISCUSSIONS</div><h2 id="conversationTitle">Architecture</h2></div><span class="tiny">Historique conservé sur ce navigateur</span></div>
       <div class="conversationGrid">
-        <section class="conversationColumn"><div class="conversationColumnTitle">💬 Toi ↔ <span id="conversationAgentName">Agent</span></div><div id="conversationDirect" class="conversationBody"></div></section>
-        <section class="conversationColumn"><div class="conversationColumnTitle">♛ Agent ↔ Chef</div><div id="conversationChief" class="conversationBody"></div></section>
+        <section class="conversationColumn"><div class="conversationColumnTitle">💬 Toi ↔ <span id="conversationAgentName">Agent</span></div><div id="conversationDirect" class="conversationBody"></div><div class="conversationComposer"><input id="conversationInput" placeholder="Écrire à cet agent..."><button id="conversationSend">➤</button></div></section>
+        <section class="conversationColumn"><div class="conversationColumnTitle">🔗 Réseau IA — messages envoyés et reçus</div><div id="conversationChief" class="conversationBody"></div></section>
       </div>
     </div>
   </div>
