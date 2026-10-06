@@ -65,9 +65,12 @@
         <button class="optQuick" data-opt="Analyse uniquement les discussions et propose une façon plus claire, plus agréable et plus rapide de suivre les échanges entre moi, les agents et le chef.">Améliorer les discussions</button>
         <button class="optQuick" data-opt="Analyse le design actuel de Fabien AI et propose des améliorations visuelles simples, cohérentes et utiles, sans surcharger.">Améliorer le design</button>
       </div>
-      <textarea id="optimizerInput" class="optimizerInput" placeholder="Ex. Je trouve les discussions trop petites et je veux voir plus facilement qui parle à qui..."></textarea>
-      <div class="optimizerActions"><span class="tiny">L’Optimiseur n’analyse pas tes projets. Il analyse uniquement Fabien AI.</span><button id="runOptimizer" class="primary">Analyser le site</button></div>
-      <div id="optimizerOutput" class="optimizerOutput">Demande-lui ce qui te gêne. Il te proposera des changements concrets.</div>
+      <div id="optimizerChat" class="optimizerChat"><div class="empty">Parle-lui comme à une vraie IA. L’historique restera ici.</div></div>
+      <div class="optimizerComposer">
+        <textarea id="optimizerInput" class="optimizerInput" placeholder="Écris à l’Optimiseur..."></textarea>
+        <button id="runOptimizer" class="primary">Envoyer</button>
+      </div>
+      <div class="optimizerActions"><span class="tiny">L’Optimiseur n’analyse pas tes projets. Il travaille uniquement sur Fabien AI.</span><button id="clearOptimizerChat" class="ghost">Effacer cette conversation</button></div>
     </div>
   </div>
 
