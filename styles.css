@@ -3,3 +3,34 @@
 .optimizerCard{width:min(900px,96vw);max-width:900px}.optimizerHeader h2,.conversationHeader h2{margin:5px 0 5px;font-size:24px}.optimizerHeader p{margin:0;color:#aebed0;font-size:12px}.optimizerBadge{display:inline-block;font-size:9px;font-weight:900;letter-spacing:.12em;color:#91c8ff;border:1px solid #294c72;border-radius:999px;padding:4px 7px;background:#0c2035}.quickRow{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 10px}.optQuick{border:1px solid #27425f;background:#0c1828;color:#cfe0f2;border-radius:999px;padding:7px 10px;font-size:11px}.optQuick:hover{border-color:#4ca4ff;background:#10233b}.optimizerInput{width:100%;min-height:105px;resize:vertical;border:1px solid #25405f;border-radius:12px;background:#07111e;color:white;padding:12px;outline:none}.optimizerActions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:9px}.optimizerActions .primary{width:auto}.optimizerOutput{margin-top:14px;min-height:170px;max-height:42vh;overflow:auto;white-space:pre-wrap;background:#07111e;border:1px solid #203a59;border-radius:12px;padding:14px;font-size:12px;line-height:1.6;color:#d5e0ec}
 .conversationCard{width:min(1180px,96vw);max-width:1180px}.conversationHeader{display:flex;justify-content:space-between;align-items:flex-end;gap:15px;margin-bottom:14px}.conversationGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.conversationColumn{border:1px solid #203a59;background:#081321;border-radius:14px;padding:12px;min-height:500px}.conversationColumnTitle{font-size:12px;font-weight:850;color:#dce9f6;border-bottom:1px solid #1c314a;padding-bottom:10px;margin-bottom:9px}.conversationBody{height:min(58vh,560px);overflow:auto;display:flex;flex-direction:column;gap:9px;padding:4px}.conversationBody .msg{font-size:12px;max-width:90%;padding:10px 12px}.conversationBody .who{font-size:10px}
 @media(max-width:800px){.conversationGrid{grid-template-columns:1fr}.conversationColumn{min-height:330px}.conversationBody{height:38vh}.optimizerActions{display:block}.optimizerActions .primary{margin-top:8px;width:100%}}
+
+
+/* Optimisation UX v1 — discussions prioritaires, interface plus calme */
+.shell{grid-template-columns:200px 1fr}
+.main{padding:14px}
+.panel{background:#0a1522;box-shadow:0 8px 28px #0003}
+.room{min-height:455px}
+.detail{min-height:455px}
+.lower{grid-template-columns:.7fr 1.35fr 1.35fr;gap:10px}
+.lowerPanel{min-height:390px;padding:14px}
+.chatBody{height:295px}
+.msg{font-size:12.5px;line-height:1.5;padding:10px 12px}
+.who{font-size:10px}
+.activityList{max-height:285px}
+.path{opacity:.34}
+.orb{box-shadow:0 0 11px var(--c),0 0 20px color-mix(in srgb,var(--c) 35%,transparent)}
+.orbWrap.working .orb{animation:workMove 4.2s ease-in-out infinite,glow 2.4s ease-in-out infinite}
+.orbWrap.resting .orb{animation:restMove 9s ease-in-out infinite,breath 4.5s ease-in-out infinite}
+.setupBanner{background:#0b1826}
+.taskBox{background:#0a1522}
+.chatExpand{font-size:11px;padding:6px 9px}
+.conversationCard{width:min(1240px,97vw);max-width:1240px}
+.conversationColumn{min-height:560px}
+.conversationBody{height:min(64vh,650px)}
+.conversationBody .msg{font-size:13px;line-height:1.55}
+@media(max-width:1100px){
+  .shell{grid-template-columns:180px 1fr}
+  .lower{grid-template-columns:1fr}
+  .lowerPanel{min-height:300px}
+  .chatBody{height:230px}
+}
