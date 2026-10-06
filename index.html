@@ -12,6 +12,7 @@
   <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
+  <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
   <div class="sidebarBottom"><div class="localStatus"><span id="engineDot" class="statusDot"></span><span id="engineText">IA locale non chargée</span></div><button id="privacyBtn" class="privacyBtn">🔒 Confidentialité</button></div>
 </aside>
 <main class="main">
@@ -47,11 +48,39 @@
 </div>
 <div class="lower">
 <section class="panel lowerPanel"><div class="panelTitle">Activité en temps réel</div><div id="activityList" class="activityList"><div class="empty">Aucune activité.</div></div></section>
-<section id="directPanel" class="panel lowerPanel"><div class="panelTitle"><span id="directTitle">Parler au Chef</span><span id="directOnline" class="tiny">● disponible</span></div><div id="directChat" class="chatBody"></div><div class="chatInput"><input id="directInput" placeholder="Écrire un message..."><button id="sendDirect">➤</button></div></section>
-<section id="chiefPanel" class="panel lowerPanel"><div class="panelTitle">Discussion avec le chef</div><div id="chiefChat" class="chatBody"></div></section>
+<section id="directPanel" class="panel lowerPanel"><div class="panelTitle"><span id="directTitle">Parler au Chef</span><span class="panelActions"><span id="directOnline" class="tiny">● disponible</span><button class="chatExpand" data-open-chat="direct">⤢ Agrandir</button></span></div><div id="directChat" class="chatBody"></div><div class="chatInput"><input id="directInput" placeholder="Écrire un message..."><button id="sendDirect">➤</button></div></section>
+<section id="chiefPanel" class="panel lowerPanel"><div class="panelTitle"><span>Discussion avec le chef</span><button class="chatExpand" data-open-chat="chief">⤢ Agrandir</button></div><div id="chiefChat" class="chatBody"></div></section>
 </div>
 <section class="panel report"><div class="panelTitle"><span>Rapport final</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
 </main></div>
 <div id="privacyModal" class="modal hidden"><div class="modalCard"><button id="closePrivacy" class="modalClose">×</button><h2>Confidentialité</h2><p>Fabien AI n’utilise aucune API payante. Les projets, conversations et rapports sont stockés dans ce navigateur. Le modèle s’exécute localement via WebGPU.</p><p>Le dépôt GitHub contient seulement le code. Les agents ne remplacent pas les professionnels réglementés et doivent signaler quand une validation externe est nécessaire.</p><button id="clearLocal" class="danger">Effacer toutes les données locales</button></div></div>
+<div id="optimizerModal" class="modal hidden">
+    <div class="modalCard optimizerCard">
+      <button id="closeOptimizer" class="modalClose">×</button>
+      <div class="optimizerHeader">
+        <div><div class="optimizerBadge">✨ AGENT DÉDIÉ</div><h2>Optimiseur de Fabien AI</h2><p>Il travaille uniquement sur ce site : simplicité, design, discussions, navigation et efficacité.</p></div>
+      </div>
+      <div class="quickRow">
+        <button class="optQuick" data-opt="Simplifie au maximum l’interface. Dis-moi ce qui peut être retiré, regroupé ou rendu plus évident.">Simplifier le site</button>
+        <button class="optQuick" data-opt="Analyse uniquement les discussions et propose une façon plus claire, plus agréable et plus rapide de suivre les échanges entre moi, les agents et le chef.">Améliorer les discussions</button>
+        <button class="optQuick" data-opt="Analyse le design actuel de Fabien AI et propose des améliorations visuelles simples, cohérentes et utiles, sans surcharger.">Améliorer le design</button>
+      </div>
+      <textarea id="optimizerInput" class="optimizerInput" placeholder="Ex. Je trouve les discussions trop petites et je veux voir plus facilement qui parle à qui..."></textarea>
+      <div class="optimizerActions"><span class="tiny">L’Optimiseur n’analyse pas tes projets. Il analyse uniquement Fabien AI.</span><button id="runOptimizer" class="primary">Analyser le site</button></div>
+      <div id="optimizerOutput" class="optimizerOutput">Demande-lui ce qui te gêne. Il te proposera des changements concrets.</div>
+    </div>
+  </div>
+
+  <div id="conversationModal" class="modal hidden">
+    <div class="modalCard conversationCard">
+      <button id="closeConversation" class="modalClose">×</button>
+      <div class="conversationHeader"><div><div class="optimizerBadge">DISCUSSIONS</div><h2 id="conversationTitle">Architecture</h2></div><span class="tiny">Conversation complète de l’agent sélectionné</span></div>
+      <div class="conversationGrid">
+        <section class="conversationColumn"><div class="conversationColumnTitle">💬 Toi ↔ <span id="conversationAgentName">Agent</span></div><div id="conversationDirect" class="conversationBody"></div></section>
+        <section class="conversationColumn"><div class="conversationColumnTitle">♛ Agent ↔ Chef</div><div id="conversationChief" class="conversationBody"></div></section>
+      </div>
+    </div>
+  </div>
+
 <script type="module" src="./app.js"></script>
 </body></html>
