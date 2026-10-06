@@ -4,6 +4,7 @@ const $=id=>document.getElementById(id);
 const DBKEY="fabien_ai_web_v1";
 let engine=null,engineReady=false,engineLoading=false,running=false;
 let selectedAgent="coordinator",currentProjectId=null;
+const SITE_BLUEPRINT=`Fabien AI est une application web locale avec : une liste de projets, une salle visuelle avec des agents sous forme de ronds, un panneau de détail de l’agent sélectionné, une conversation directe avec cet agent, une discussion entre cet agent et le Chef, un fil d’activité, un rapport final, une mémoire par projet, un réglage 1/2/3 agents et une IA locale dans Chrome. L’objectif principal est d’être extrêmement simple, lisible, rapide et évident pour Fabien. L’Optimiseur ne doit jamais analyser le contenu métier des projets : uniquement l’ergonomie, le design, les discussions, la navigation et le fonctionnement du site.`;
 
 const AGENTS={
 coordinator:{name:"Chef",icon:"♛",color:"#4ca4ff",role:"Tu es le chef de projet. Tu coordonnes les spécialistes, évites les doublons, synthétises et demandes les validations nécessaires."},
@@ -29,6 +30,7 @@ const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLo
 function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-1.5B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
 function loadDB(){try{return {...baseDB(),...JSON.parse(localStorage.getItem(DBKEY)||"{}")}}catch{return baseDB()}}
 let db=loadDB();
+db.optimizer=db.optimizer||[];
 const save=()=>localStorage.setItem(DBKEY,JSON.stringify(db));
 const project=()=>db.projects.find(p=>p.id===currentProjectId)||db.projects[0];
 function showError(m=""){$("error").textContent=m;$("error").classList.toggle("show",!!m)}
@@ -44,8 +46,32 @@ function elapsed(iso){if(!iso)return"Disponible";const s=Math.max(0,Math.floor((
 function renderDetail(){const r=stateRows()[selectedAgent],m=AGENTS[selectedAgent],s=r.status||"resting";$("miniOrb").style.setProperty("--selc",m.color);$("agentName").textContent=m.name;$("agentState").textContent=stateLabel(s);$("agentTask").textContent=r.task||"Aucune mission";$("agentSince").textContent=r.started_at?elapsed(r.started_at):"Disponible";$("agentNext").textContent=s==="working"?"Envoyer son résultat au chef":s==="waiting"?"Commencer quand son tour arrive":s==="blocked"?"Résoudre le blocage":"Attend une nouvelle mission";$("agentProgress").style.width=(r.progress||0)+"%";$("agentProgressText").textContent=(r.progress||0)+" %";$("blocker").className="blocker "+(s==="blocked"?"show":"");$("blocker").textContent=s==="blocked"?"⚠ "+(r.reason||"Cet agent est bloqué."):"";$("agentOutput").textContent=r.output||"Cet agent se repose. Tu peux quand même lui parler directement.";$("directTitle").textContent="Parler à "+m.name}
 function renderActivity(){const a=(project().activity||[]).slice(-12).reverse();$("activityList").innerHTML=a.length?a.map(x=>`<div class="activity"><time>${fmt(x.time)}</time><div><b>${esc(AGENTS[x.agent]?.name||x.agent)}</b> · ${esc(x.text)}</div></div>`).join(""):'<div class="empty">Aucune activité.</div>'}
 function renderChats(){const msgs=project().messages||[],d=msgs.filter(m=>m.channel==="direct"&&(m.from===selectedAgent||m.to===selectedAgent));$("directChat").innerHTML=d.length?d.slice(-30).map(m=>`<div class="msg ${m.from==="user"?"me":"agent"}"><div class="who">${esc(m.from==="user"?"Vous":AGENTS[m.from]?.name||m.from)} · ${fmt(m.time)}</div>${esc(m.body)}</div>`).join(""):'<div class="empty">Écris à cet agent indépendamment de l’équipe.</div>';const i=msgs.filter(m=>m.channel==="internal"&&((m.from===selectedAgent&&m.to==="coordinator")||(m.from==="coordinator"&&m.to===selectedAgent)));$("chiefChat").innerHTML=i.length?i.slice(-30).map(m=>`<div class="msg internal"><div class="who">${esc(AGENTS[m.from]?.name||m.from)} · ${fmt(m.time)}</div>${esc(m.body)}</div>`).join(""):'<div class="empty">Les échanges avec le chef apparaîtront ici.</div>'}
+function renderConversationModal(){
+  const msgs=project().messages||[],m=AGENTS[selectedAgent];
+  $("conversationTitle").textContent=m.name;$("conversationAgentName").textContent=m.name;
+  const direct=msgs.filter(x=>x.channel==="direct"&&(x.from===selectedAgent||x.to===selectedAgent));
+  $("conversationDirect").innerHTML=direct.length?direct.slice(-80).map(x=>`<div class="msg ${x.from==="user"?"me":"agent"}"><div class="who">${esc(x.from==="user"?"Vous":AGENTS[x.from]?.name||x.from)} · ${fmt(x.time)}</div>${esc(x.body)}</div>`).join(""):'<div class="empty">Aucune discussion directe pour le moment.</div>';
+  const internal=msgs.filter(x=>x.channel==="internal"&&((x.from===selectedAgent&&x.to==="coordinator")||(x.from==="coordinator"&&x.to===selectedAgent)));
+  $("conversationChief").innerHTML=internal.length?internal.slice(-80).map(x=>`<div class="msg internal"><div class="who">${esc(AGENTS[x.from]?.name||x.from)} · ${fmt(x.time)}</div>${esc(x.body)}</div>`).join(""):'<div class="empty">Aucun échange avec le Chef pour le moment.</div>';
+}
+function openConversation(){$("conversationModal").classList.remove("hidden");renderConversationModal()}
+async function runOptimizer(){
+  const input=$("optimizerInput").value.trim()||"Analyse Fabien AI et propose les améliorations les plus utiles pour le rendre plus simple et plus efficace.";
+  $("runOptimizer").disabled=true;$("runOptimizer").textContent="Analyse…";$("optimizerOutput").textContent="L’Optimiseur analyse uniquement le site…";
+  try{
+    const history=(db.optimizer||[]).slice(-6).map(x=>`${x.role}: ${x.text}`).join("\n");
+    const answer=await llm(
+      "Tu es l’Optimiseur UX/UI exclusif de Fabien AI. Tu ne travailles sur aucun projet métier. Tu dois rendre ce site plus simple, plus clair, plus rapide et plus agréable. Priorise la lisibilité des discussions, la compréhension immédiate, la réduction du nombre de clics et un design sobre. Ne propose pas une fonctionnalité juste parce qu’elle est jolie. Pour chaque proposition, explique le gain concret. Termine par TOP 3 À FAIRE EN PREMIER.",
+      `${SITE_BLUEPRINT}\n\nHISTORIQUE DES DEMANDES D’OPTIMISATION:\n${history||"Aucun"}\n\nDEMANDE DE FABIEN:\n${input}\n\nRéponds avec : 1) Ce qui gêne, 2) Modifications proposées, 3) Ce qui peut être supprimé/simplifié, 4) TOP 3 À FAIRE EN PREMIER.`,
+      700
+    );
+    db.optimizer.push({role:"Fabien",text:input,time:now()},{role:"Optimiseur",text:answer,time:now()});db.optimizer=db.optimizer.slice(-30);save();
+    $("optimizerOutput").textContent=answer;
+  }catch(e){$("optimizerOutput").textContent="Erreur locale : "+(e?.message||e)}
+  finally{$("runOptimizer").disabled=false;$("runOptimizer").textContent="Analyser le site"}
+}
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
-function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderReport()}
+function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderReport()}
 
 async function ensureModel(){if(engineReady&&engine)return true;if(engineLoading)return false;if(!navigator.gpu){showError("WebGPU n’est pas disponible. Utilise Chrome récent sur ce Mac.");return false}engineLoading=true;showError("");$("loadModelBtn").disabled=true;$("engineText").textContent="Chargement de l’IA locale…";const model=$("modelSelect").value;db.settings.model=model;save();try{const appConfig={...webllm.prebuiltAppConfig,cacheBackend:"indexeddb"};engine=await webllm.CreateMLCEngine(model,{appConfig,initProgressCallback:p=>{const pc=Math.round((p.progress||0)*100);$("loadBarFill").style.width=pc+"%";$("loadPct").textContent=pc+" %";$("setupText").textContent=p.text||"Téléchargement du modèle…"}});engineReady=true;$("engineDot").className="statusDot ok";$("engineText").textContent="IA locale prête";$("loadModelBtn").textContent="IA locale prête ✓";$("setupText").textContent="Le modèle est prêt. Les analyses se font dans ce navigateur.";return true}catch(e){$("engineDot").className="statusDot bad";$("engineText").textContent="Erreur IA locale";showError("Impossible de charger le modèle : "+(e?.message||e));return false}finally{engineLoading=false;$("loadModelBtn").disabled=false}}
 async function llm(system,user,max_tokens=500){if(!await ensureModel())throw new Error("IA locale non prête");const r=await engine.chat.completions.create({messages:[{role:"system",content:system+"\nRéponds en français. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes."},{role:"user",content:user}],temperature:.25,max_tokens});return strip(r.choices?.[0]?.message?.content||"")}
@@ -69,9 +95,15 @@ $("memoryBtn").onclick=()=>$("memoryDrawer").classList.toggle("open");
 $("saveMemory").onclick=()=>{const t=$("memoryText").value.trim();if(!t)return;project().memory+=(project().memory?"\n\n":"")+t;save();$("memoryText").value="";$("memoryDrawer").classList.remove("open");addActivity("mémoire du projet mise à jour");renderAll()};
 $("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
 $("sendDirect").onclick=sendDirect;$("directInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect()}});
-$("talkFocus").onclick=()=>{$("directInput").focus();$("directPanel").scrollIntoView({behavior:"smooth"})};
-$("historyFocus").onclick=()=>$("chiefPanel").scrollIntoView({behavior:"smooth"});
+$("talkFocus").onclick=()=>openConversation();
+$("historyFocus").onclick=()=>openConversation();
+document.querySelectorAll("[data-open-chat]").forEach(b=>b.onclick=openConversation);
+$("closeConversation").onclick=()=>$("conversationModal").classList.add("hidden");$("conversationModal").onclick=e=>{if(e.target===$("conversationModal"))$("conversationModal").classList.add("hidden")};
 $("copyReport").onclick=async()=>{try{await navigator.clipboard.writeText($("reportText").textContent);$("copyReport").textContent="Copié ✓";setTimeout(()=>$("copyReport").textContent="Copier",1200)}catch{}};
+$("optimizerBtn").onclick=()=>{$("optimizerModal").classList.remove("hidden");$("optimizerInput").focus()};
+$("closeOptimizer").onclick=()=>$("optimizerModal").classList.add("hidden");$("optimizerModal").onclick=e=>{if(e.target===$("optimizerModal"))$("optimizerModal").classList.add("hidden")};
+document.querySelectorAll(".optQuick").forEach(b=>b.onclick=()=>{$("optimizerInput").value=b.dataset.opt;$("optimizerInput").focus()});
+$("runOptimizer").onclick=runOptimizer;
 $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("closePrivacy").onclick=()=>$("privacyModal").classList.add("hidden");$("privacyModal").onclick=e=>{if(e.target===$("privacyModal"))$("privacyModal").classList.add("hidden")};
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
