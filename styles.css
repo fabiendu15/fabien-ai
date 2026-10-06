@@ -41,3 +41,12 @@
 .conversationComposer button{border:0;border-radius:50%;background:#4ca4ff;color:white;font-weight:800}
 .conversationColumn:nth-child(2) .msg.internal{max-width:96%;background:#10233a}
 .conversationColumn:nth-child(2) .who{color:#98b4d4}
+
+.optimizerChat{height:min(48vh,460px);overflow:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;padding:12px;background:#07111e;border:1px solid #203a59;border-radius:12px}
+.optimizerChat .msg{font-size:12.5px;line-height:1.55;max-width:88%;padding:10px 12px}
+.optimizerChat .msg.me{align-self:flex-end;background:#164f91}
+.optimizerChat .msg.agent{align-self:flex-start;background:#0d3b32}
+.optimizerComposer{display:grid;grid-template-columns:1fr 110px;gap:9px;margin-top:10px;align-items:end}
+.optimizerComposer .optimizerInput{min-height:74px;max-height:150px;margin:0}
+.optimizerComposer .primary{height:44px}
+@media(max-width:760px){.optimizerComposer{grid-template-columns:1fr}.optimizerComposer .primary{width:100%}.optimizerChat{height:45vh}}
