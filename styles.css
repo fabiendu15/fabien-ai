@@ -34,3 +34,10 @@
   .lowerPanel{min-height:300px}
   .chatBody{height:230px}
 }
+
+.conversationComposer{display:grid;grid-template-columns:1fr 42px;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #1d334d}
+.conversationComposer input{background:#07111e;color:white;border:1px solid #294666;border-radius:999px;padding:10px 13px;outline:none}
+.conversationComposer input:focus{border-color:#4ca4ff;box-shadow:0 0 0 2px #4ca4ff22}
+.conversationComposer button{border:0;border-radius:50%;background:#4ca4ff;color:white;font-weight:800}
+.conversationColumn:nth-child(2) .msg.internal{max-width:96%;background:#10233a}
+.conversationColumn:nth-child(2) .who{color:#98b4d4}
