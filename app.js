@@ -19,7 +19,7 @@ critic:{name:"Critique",icon:"⌕",color:"#ff5d8a",role:"Tu cherches contradicti
 verifier:{name:"Vérification",icon:"✓",color:"#a981ff",role:"Tu consolides les analyses. Distingue FAITS, HYPOTHÈSES, À VÉRIFIER et DÉCISIONS. Ne valide jamais une exigence légale ou réglementaire sans source compétente."}
 };
 const SPECIALISTS=["finance","spaces","operations","clinic","toladi","marketing","investor"];
-const SLOTS={working:[[8,18],[23,25],[12,31]],waiting:[[64,18],[78,23],[70,28]],blocked:[[8,69],[23,73],[13,78]],resting:[[55,68],[67,70],[79,70],[60,79],[72,80],[84,79]]};
+const SLOTS={working:[[8,18],[22,18],[14,30],[30,30]],waiting:[[63,17],[73,17],[83,17],[67,28],[78,28],[88,28]],blocked:[[8,67],[21,67],[34,67],[13,79],[28,79]],resting:[[56,66],[64,66],[72,66],[80,66],[88,66],[56,80],[64,80],[72,80],[80,80],[88,80]]};
 
 const now=()=>new Date().toISOString();
 const uid=()=>crypto.randomUUID?.()||Date.now()+"-"+Math.random().toString(16).slice(2);
