@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./styles.css?v=20261006-1810">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v1.4</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -58,17 +58,18 @@
     <div class="modalCard optimizerCard">
       <button id="closeOptimizer" class="modalClose">×</button>
       <div class="optimizerHeader">
-        <div><div class="optimizerBadge">✨ AGENT DÉDIÉ</div><h2>Optimiseur de Fabien AI</h2><p>Il travaille uniquement sur ce site : simplicité, design, discussions, navigation et efficacité.</p></div>
+        <div><div class="optimizerBadge">✨ AGENT DÉDIÉ</div><h2>Optimiseur de Fabien AI</h2><p>Une vraie conversation pour améliorer uniquement ce site.</p></div>
+        <div class="optimizerPresence"><span></span> En ligne</div>
       </div>
       <div class="quickRow">
         <button class="optQuick" data-opt="Simplifie au maximum l’interface. Dis-moi ce qui peut être retiré, regroupé ou rendu plus évident.">Simplifier le site</button>
         <button class="optQuick" data-opt="Analyse uniquement les discussions et propose une façon plus claire, plus agréable et plus rapide de suivre les échanges entre moi, les agents et le chef.">Améliorer les discussions</button>
         <button class="optQuick" data-opt="Analyse le design actuel de Fabien AI et propose des améliorations visuelles simples, cohérentes et utiles, sans surcharger.">Améliorer le design</button>
       </div>
-      <div id="optimizerChat" class="optimizerChat"><div class="empty">Parle-lui comme à une vraie IA. L’historique restera ici.</div></div>
+      <div class="optimizerChatLabel">💬 Conversation permanente</div><div id="optimizerChat" class="optimizerChat"><div class="optimizerWelcome"><strong>Optimiseur</strong><br>Dis-moi ce que tu veux changer sur Fabien AI. Je garde l’historique de notre conversation.</div></div>
       <div class="optimizerComposer">
-        <textarea id="optimizerInput" class="optimizerInput" placeholder="Écris à l’Optimiseur..."></textarea>
-        <button id="runOptimizer" class="primary">Envoyer</button>
+        <textarea id="optimizerInput" class="optimizerInput" placeholder="Écris ton message à l’Optimiseur…"></textarea>
+        <button id="runOptimizer" class="primary">Envoyer ➤</button>
       </div>
       <div class="optimizerActions"><span class="tiny">L’Optimiseur n’analyse pas tes projets. Il travaille uniquement sur Fabien AI.</span><button id="clearOptimizerChat" class="ghost">Effacer cette conversation</button></div>
     </div>
@@ -85,5 +86,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=20261006-1810"></script>
 </body></html>
