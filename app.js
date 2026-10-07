@@ -32,9 +32,23 @@ const strip=s=>String(s??"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<
 const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"})};
 
 function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-1.5B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
-function loadDB(){try{return {...baseDB(),...JSON.parse(localStorage.getItem(DBKEY)||"{}")}}catch{return baseDB()}}
+function loadDB(){
+  try{
+    const base=baseDB(),saved=JSON.parse(localStorage.getItem(DBKEY)||"{}"),merged={...base,...saved};
+    if(!Array.isArray(merged.projects)||merged.projects.length===0)merged.projects=base.projects;
+    merged.projects=merged.projects.map(p=>({
+      id:p.id||uid(),name:p.name||"Mon projet",description:p.description||"Projet local",
+      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],created_at:p.created_at||now(),
+      runs:Array.isArray(p.runs)?p.runs:[],messages:Array.isArray(p.messages)?p.messages:[],activity:Array.isArray(p.activity)?p.activity:[]
+    }));
+    if(!merged.projects.some(p=>p.id===merged.selectedProject))merged.selectedProject=merged.projects[0].id;
+    merged.settings={...base.settings,...(saved.settings||{})};
+    return merged;
+  }catch{return baseDB()}
+}
 let db=loadDB();
 db.optimizer=db.optimizer||[];
+save();
 const save=()=>localStorage.setItem(DBKEY,JSON.stringify(db));
 const project=()=>db.projects.find(p=>p.id===currentProjectId)||db.projects[0];
 function showError(m=""){$("error").textContent=m;$("error").classList.toggle("show",!!m)}
@@ -234,4 +248,4 @@ $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("clos
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
 if(!navigator.gpu){$("engineDot").className="statusDot bad";$("engineText").textContent="WebGPU indisponible";$("setupText").textContent="Utilise Chrome récent pour faire tourner l’IA localement."}else $("engineText").textContent="IA locale disponible";
-currentProjectId=db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject)?db.selectedProject:db.projects[0].id;$("projectTitle").textContent=project().name;renderAll();setInterval(renderDetail,1000);
+currentProjectId=(db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject))?db.selectedProject:db.projects[0].id;db.selectedProject=currentProjectId;save();$("projectTitle").textContent=project()?.name||"Mon projet";renderAll();setInterval(renderDetail,1000);
