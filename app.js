@@ -2,7 +2,7 @@ import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
 const $=id=>document.getElementById(id);
 const DBKEY="fabien_ai_web_v1";
-let engine=null,engineReady=false,engineLoading=false,running=false,ollamaReady=false,ollamaChecked=false;
+let engine=null,engineReady=false,engineLoading=false,running=false;
 let selectedAgent="coordinator",currentProjectId=null;
 const SITE_BLUEPRINT=`Fabien AI est une application web locale avec : une liste de projets, une salle visuelle avec des agents sous forme de ronds, un panneau de détail de l’agent sélectionné, une conversation directe avec cet agent, une discussion entre cet agent et le Chef, un fil d’activité, un rapport final, une mémoire par projet, un réglage 1/2/3 agents et une IA locale dans Chrome. L’objectif principal est d’être extrêmement simple, lisible, rapide et évident pour Fabien. L’Optimiseur ne doit jamais analyser le contenu métier des projets : uniquement l’ergonomie, le design, les discussions, la navigation et le fonctionnement du site.`;
 
@@ -31,7 +31,7 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const strip=s=>String(s??"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<\/think>/gi,"").replace(/^\s*(Let me|We need|I need|I will)[^\n]*\n+/i,"").trim();
 const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"})};
 
-function baseDB(){return {settings:{parallel:2,model:"ollama:qwen3:4b",ollamaModel:"qwen3:4b"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
+function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-3B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
 function loadDB(){
   try{
     const base=baseDB(),saved=JSON.parse(localStorage.getItem(DBKEY)||"{}"),merged={...base,...saved};
@@ -413,70 +413,69 @@ function similarText(a,b){
 }
 async function chatAgent(agentId,userMessage){
   const m=AGENTS[agentId],p=project(),all=p.messages||[];
-  const direct=all.filter(x=>x.channel==="direct"&&(x.from===agentId||x.to===agentId)).slice(-14);
-  const projectSummary=projectContext().slice(0,9500);
+  const direct=all.filter(x=>x.channel==="direct"&&(x.from===agentId||x.to===agentId)).slice(-8);
+  const context=projectContext().slice(0,5200);
   const system=`${m.role}
-Tu discutes avec Fabien comme un vrai collègue humain.
+Tu discutes avec Fabien comme un collègue humain.
 Règles:
-- Toujours en français naturel.
-- Réponds d’abord exactement à son dernier message.
+- Toujours en français naturel et direct.
+- Réponds d’abord au dernier message.
 - Ne répète pas une réponse précédente.
-- Ne dis jamais que tu as besoin d’un fichier s’il est déjà présent dans le contexte du projet.
-- Si un fichier n’a pas été lu, dis précisément lequel.
-- Ne fais pas de long rapport sauf si Fabien le demande.
-- Si tu peux agir à partir des données présentes, fais-le au lieu de demander de nouveau.
-- N’invente aucun fait, chiffre ou source.
-
+- Si le fichier ou dossier est déjà présent dans le contexte, ne le redemande pas.
+- Si Fabien te donne un ordre clair, confirme brièvement puis exécute ce qui est possible.
+- N’invente rien.
 CONTEXTE DU PROJET:
-${projectSummary||"Aucun contexte enregistré."}`;
+${context||"Aucun contexte enregistré."}`;
   const messages=[{role:"system",content:system}];
   for(const x of direct){
-    messages.push({role:x.from==="user"?"user":"assistant",content:String(x.body).slice(0,1800)});
+    messages.push({
+      role:x.from==="user"?"user":"assistant",
+      content:String(x.body).slice(0,900)
+    });
   }
-  // Current user message is already in direct history after addMessage; avoid duplicate.
-  let reply;
-  if(await checkOllama()){
-    reply=await ollamaChat(messages,650,.48);
-    const prev=direct.filter(x=>x.from===agentId).slice(-1)[0]?.body||"";
-    if(similarText(reply,prev)){
-      messages.push({role:"system",content:"Ta réponse ressemble trop à la précédente. Réponds autrement et traite uniquement le dernier message de Fabien, de façon concrète."});
-      reply=await ollamaChat(messages,650,.68);
-    }
-    return reply;
+  const r=await engine.chat.completions.create({
+    messages,
+    temperature:.55,
+    max_tokens:420
+  });
+  let reply=strip(r.choices?.[0]?.message?.content||"");
+  const prev=direct.filter(x=>x.from===agentId).slice(-1)[0]?.body||"";
+  if(similarText(reply,prev)){
+    const r2=await engine.chat.completions.create({
+      messages:[...messages,{role:"system",content:"Ta réponse ressemble trop à la précédente. Réponds autrement et traite uniquement le dernier message de Fabien."}],
+      temperature:.75,max_tokens:420
+    });
+    reply=strip(r2.choices?.[0]?.message?.content||"");
   }
-  // Browser fallback: intentionally smaller context
-  const recent=direct.slice(-6).map(x=>`${x.from==="user"?"Fabien":m.name}: ${String(x.body).slice(0,900)}`).join("\n");
-  return await llm(m.role+`\nRéponds comme un collègue humain. Ne répète pas tes anciennes réponses.`,
-    `CONTEXTE RÉSUMÉ:\n${projectSummary.slice(0,5500)}\n\nCONVERSATION:\n${recent}\n\nRéponds au dernier message de Fabien.`,450);
+  return reply;
 }
 async function ensureModel(){
-  const selected=$("modelSelect").value;
-  db.settings.model=selected;save();
-  if(selected.startsWith("ollama:")){
-    db.settings.ollamaModel=selected.slice(7)||"qwen3:4b";save();
-    $("engineText").textContent="Connexion à Ollama…";
-    if(await checkOllama())return true;
-    $("engineDot").className="statusDot bad";
-    $("engineText").textContent="Ollama non connecté";
-    $("loadModelBtn").textContent="Reconnecter Ollama";
-    $("setupText").textContent="Ollama n’est pas joignable depuis le site. Ouvre Ollama sur ton Mac puis reconnecte.";
-    addNotification("coordinator","Ollama n’est pas connecté","Le moteur Qwen3 4B n’est pas accessible. Ouvre Ollama sur ton Mac, puis clique sur Reconnecter Ollama.","warning","open-agent");
-    return false;
-  }
   if(engineReady&&engine)return true;
   if(engineLoading)return false;
   if(!navigator.gpu){showError("WebGPU n’est pas disponible. Utilise Chrome récent sur ce Mac.");return false}
-  engineLoading=true;showError("");$("loadModelBtn").disabled=true;$("engineText").textContent="Chargement de l’IA navigateur…";
-  const model=selected;
+  engineLoading=true;showError("");$("loadModelBtn").disabled=true;$("engineText").textContent="Chargement de l’IA dans Chrome…";
+  const model=$("modelSelect").value;db.settings.model=model;save();
   try{
     const appConfig={...webllm.prebuiltAppConfig,cacheBackend:"indexeddb"};
     engine=await webllm.CreateMLCEngine(model,{appConfig,initProgressCallback:p=>{
-      const pc=Math.round((p.progress||0)*100);$("loadBarFill").style.width=pc+"%";$("loadPct").textContent=pc+" %";$("setupText").textContent=p.text||"Téléchargement du modèle…"
+      const pc=Math.round((p.progress||0)*100);
+      $("loadBarFill").style.width=pc+"%";$("loadPct").textContent=pc+" %";
+      $("setupText").textContent=p.text||"Téléchargement du modèle…";
     }});
-    engineReady=true;$("engineDot").className="statusDot ok";$("engineText").textContent="IA navigateur prête";$("loadModelBtn").textContent="IA prête ✓";$("setupText").textContent="Mode de secours navigateur actif.";return true
+    engineReady=true;
+    $("engineDot").className="statusDot ok";
+    $("engineText").textContent="IA Chrome prête";
+    $("loadModelBtn").textContent="IA prête ✓";
+    $("setupText").textContent="L’IA travaille directement dans cette page tant qu’elle reste ouverte.";
+    return true;
   }catch(e){
-    $("engineDot").className="statusDot bad";$("engineText").textContent="Erreur IA locale";showError("Impossible de charger le modèle : "+(e?.message||e));return false
-  }finally{engineLoading=false;$("loadModelBtn").disabled=false}
+    $("engineDot").className="statusDot bad";
+    $("engineText").textContent="Erreur IA";
+    showError("Impossible de charger le modèle : "+(e?.message||e));
+    return false;
+  }finally{
+    engineLoading=false;$("loadModelBtn").disabled=false;
+  }
 }
 function compactPrompt(text,max=8500){
   const t=String(text||"");if(t.length<=max)return t;
@@ -484,22 +483,23 @@ function compactPrompt(text,max=8500){
   return t.slice(0,head)+"\n\n[... contenu intermédiaire condensé automatiquement ...]\n\n"+t.slice(-tail);
 }
 async function llm(system,user,max_tokens=500){
-  const sys=system+"\nRéponds toujours en français naturel. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes.";
-  if(($("modelSelect").value||db.settings.model||"").startsWith("ollama:")){
-    if(!await ensureModel())throw new Error("Ollama non prêt");
-    return await ollamaChat([{role:"system",content:sys},{role:"user",content:compactPrompt(user,15000)}],max_tokens,.35);
-  }
   if(!await ensureModel())throw new Error("IA locale non prête");
-  let prompt=db.settings.compactContext?compactPrompt(user,7000):String(user||"");
+  const sys=system+"\nRéponds toujours en français naturel. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes.";
+  let prompt=compactPrompt(user,6200);
   try{
-    const r=await engine.chat.completions.create({messages:[{role:"system",content:sys},{role:"user",content:prompt}],temperature:.25,max_tokens});
+    const r=await engine.chat.completions.create({
+      messages:[{role:"system",content:sys},{role:"user",content:prompt}],
+      temperature:.45,max_tokens
+    });
     return strip(r.choices?.[0]?.message?.content||"");
   }catch(e){
     const info=humanError(e);
     if(info.kind==="context"){
-      addNotification("coordinator","Je réduis le contexte",info.message,"warning","open-agent",String(e?.message||e));
-      prompt=compactPrompt(user,6200);
-      const r=await engine.chat.completions.create({messages:[{role:"system",content:sys},{role:"user",content:prompt}],temperature:.2,max_tokens:Math.min(max_tokens,650)});
+      prompt=compactPrompt(user,4300);
+      const r=await engine.chat.completions.create({
+        messages:[{role:"system",content:sys},{role:"user",content:prompt}],
+        temperature:.35,max_tokens:Math.min(max_tokens,500)
+      });
       return strip(r.choices?.[0]?.message?.content||"");
     }
     throw e;
@@ -538,7 +538,7 @@ async function runMission(){
     setA(run,"verifier",{status:"working",task:"Consolide le rapport final",progress:25,started_at:now()});
     const final=await llm(AGENTS.verifier.role,`MISSION:\n${goal}\n\nMÉMOIRE ET FICHIERS:\n${memory()||"Aucune"}\n\nANALYSES:\n${pack}\n\nCRITIQUE:\n${crit}\n\nRédige un rapport clair avec RÉPONSE, CHIFFRES/HYPOTHÈSES, PROBLÈMES À CORRIGER, DÉCISIONS POUR FABIEN, PROCHAINE ACTION.`,850);
     setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
-    run.final_report=final;run.status="done";save();addActivity("rapport final terminé","verifier");renderAll();
+    run.final_report=final;run.status="done";save();addActivity("rapport final terminé","verifier");addMessage("coordinator","user","L’équipe a terminé la mission. Le rapport final est prêt plus bas sur la page.","direct");renderAll();
   }catch(e){
     const info=humanError(e);
     for(const a of run.agents||[]){
@@ -553,23 +553,41 @@ async function runMission(){
   }
   finally{running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false}
 }
+function looksLikeMission(text){
+  return /\b(fais|faire|prépare|préparer|analyse|analyser|lance|lancer|travaille|travailler|avance|avancer|continue|continuer|crée|créer|refais|revoir|vérifie|vérifier|organise|organiser|construis|construire|mets à jour|mettre à jour)\b/i.test(text);
+}
 async function sendDirect(sourceId="directInput"){
   const inp=$(sourceId),msg=inp.value.trim();if(!msg)return;
   inp.value="";addMessage("user",selectedAgent,msg,"direct");renderChats();renderConversationModal();$("directOnline").textContent="● réfléchit…";
+
+  // Si Fabien donne un ordre au Chef, le Chef lance réellement la mission.
+  if(selectedAgent==="coordinator" && looksLikeMission(msg) && !running){
+    addMessage("coordinator","user","D’accord. Je lance le travail maintenant avec l’équipe et je te remonte le résultat ici.","direct");
+    $("goal").value=msg;
+    renderChats();renderConversationModal();
+    $("directOnline").textContent="● mission lancée";
+    setTimeout(()=>runMission(),80);
+    return;
+  }
+
   try{
+    if(!engineReady)await ensureModel();
     const reply=await chatAgent(selectedAgent,msg);
     addMessage(selectedAgent,"user",reply||"Je n’ai pas réussi à formuler une réponse. Réessaie ta question.","direct");
     renderChats();renderConversationModal();
   }catch(e){
-    const info=humanError(e),friendly=info.message;
-    addNotification(selectedAgent,info.title,friendly,"warning",info.action,String(e?.message||e));
-    addMessage(selectedAgent,"user",friendly,"direct");renderChats();renderConversationModal();
-  }finally{$("directOnline").textContent="● disponible"}
+    const info=humanError(e);
+    addNotification(selectedAgent,info.title,info.message,"warning",info.action,String(e?.message||e));
+    addMessage(selectedAgent,"user",info.message,"direct");
+    renderChats();renderConversationModal();
+  }finally{
+    if(!running)$("directOnline").textContent="● disponible";
+  }
 }
 
 
 $("loadModelBtn").onclick=ensureModel;
-$("modelSelect").value=db.settings.model||"ollama:qwen3:4b";
+$("modelSelect").value=db.settings.model||"Qwen2.5-3B-Instruct-q4f16_1-MLC";
 $("modelSelect").onchange=()=>{db.settings.model=$("modelSelect").value;if(db.settings.model.startsWith("ollama:"))db.settings.ollamaModel=db.settings.model.slice(7);save();engine=null;engineReady=false;ollamaReady=false;$("engineDot").className="statusDot";$("engineText").textContent="Moteur à connecter";$("loadModelBtn").textContent="Connecter l’IA"};
 $("parallel").value=String(db.settings.parallel||2);
 $("parallel").onchange=()=>{db.settings.parallel=Number($("parallel").value);save()};
@@ -598,5 +616,5 @@ $("clearNotifications").onclick=()=>{db.notifications.forEach(n=>n.read=true);sa
 $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("closePrivacy").onclick=()=>$("privacyModal").classList.add("hidden");$("privacyModal").onclick=e=>{if(e.target===$("privacyModal"))$("privacyModal").classList.add("hidden")};
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
-if(!navigator.gpu){$("engineDot").className="statusDot bad";$("engineText").textContent="WebGPU indisponible";$("setupText").textContent="Utilise Chrome récent pour faire tourner l’IA localement."}else $("engineText").textContent="IA locale disponible";
-recoverInterruptedRuns();currentProjectId=(db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject))?db.selectedProject:db.projects[0].id;db.selectedProject=currentProjectId;save();$("projectTitle").textContent=project()?.name||"Mon projet";renderAll();setInterval(renderDetail,1000);setTimeout(()=>{if(($("modelSelect").value||"").startsWith("ollama:"))checkOllama()},500);
+if(db.settings.model&&String(db.settings.model).startsWith("ollama:")){db.settings.model="Qwen2.5-3B-Instruct-q4f16_1-MLC";save()} if(!navigator.gpu){$("engineDot").className="statusDot bad";$("engineText").textContent="WebGPU indisponible";$("setupText").textContent="Utilise Chrome récent pour faire tourner l’IA dans cette page."}else $("engineText").textContent="IA Chrome disponible";
+recoverInterruptedRuns();currentProjectId=(db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject))?db.selectedProject:db.projects[0].id;db.selectedProject=currentProjectId;save();$("projectTitle").textContent=project()?.name||"Mon projet";renderAll();setInterval(renderDetail,1000);
