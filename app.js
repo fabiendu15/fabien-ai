@@ -58,32 +58,27 @@ function recoverInterruptedRuns(){
     const run=p?.runs?.[p.runs.length-1];if(!run)continue;
     const hasGhost=(run.agents||[]).some(a=>a.status==="working"||a.status==="waiting");
     if(!hasGhost)continue;
-
-    // Après un rechargement, aucune ancienne exécution JS ne peut encore tourner.
-    // Si le run n'est pas activement piloté par cette page, on le ferme proprement.
-    if(run.status==="running"||run.status==="error"||run.status==="interrupted"){
-      let changed=false;
+    if(["running","error","interrupted","paused"].includes(run.status)){
       for(const a of run.agents||[]){
         if(a.status==="working"||a.status==="waiting"){
-          a.status="blocked";
-          a.reason="Mission interrompue : le navigateur ou l’ordinateur s’est arrêté avant la fin.";
-          a.output=a.output||"Cette étape n’a pas pu se terminer. Elle peut être relancée.";
-          a.finished_at=a.finished_at||now();
-          changed=true;
+          a.status="waiting";
+          a.reason="Mission en pause après actualisation de la page.";
+          a.finished_at="";
         }
       }
-      if(changed){
-        run.status="interrupted";
-        run.final_report=run.final_report&&!/Prompt tokens exceeded|context window|prompt tokens/i.test(run.final_report)
-          ?run.final_report
-          :"Mission interrompue avant la fin. Relance-la pour reprendre avec le contexte condensé.";
-        p.activity=p.activity||[];
-        p.activity.push({id:uid(),time:now(),agent:"coordinator",text:"a détecté une mission interrompue et a arrêté les faux états de travail"});
-        p.messages=p.messages||[];
-        p.messages.push({id:uid(),from:"coordinator",to:"user",body:"La mission précédente s’est arrêtée avant la fin. Certains agents étaient encore affichés comme actifs, mais ils ne travaillaient plus. J’ai corrigé leur état. Tu peux relancer la mission quand tu veux.",channel:"direct",time:now()});
-      }
+      run.status="paused";run.resumeAvailable=true;
+      run.final_report=run.final_report&&!/Prompt tokens exceeded|context window|prompt tokens/i.test(run.final_report)?run.final_report:"Mission mise en pause. Les résultats déjà terminés sont conservés.";
+      p.activity=p.activity||[];
+      p.activity.push({id:uid(),time:now(),agent:"coordinator",text:"a mis la mission en pause après actualisation"});
     }
   }
+  save();
+}
+function latestRun(){const r=project()?.runs||[];return r[r.length-1]||null}
+function updateResumeUI(){
+  const run=latestRun(),can=!!run&&["paused","interrupted","error"].includes(run.status)&&!!run.goal&&!running;
+  const b=$("resumeBtn"),i=$("resumeInfo");if(b)b.hidden=!can;if(i)i.hidden=!can;
+  if(can&&$("goal"))$("goal").value=run.goal;
 }
 function stateRows(){const p=project(),run=p?.runs?.[p.runs.length-1],m={};Object.keys(AGENTS).forEach(a=>m[a]={agent_id:a,status:"resting",task:"",progress:0,output:"",started_at:"",finished_at:"",reason:""});(run?.agents||[]).forEach(r=>m[r.agent_id]={...m[r.agent_id],...r});return m}
 function addActivity(text,agent="coordinator"){const p=project();p.activity=p.activity||[];p.activity.push({id:uid(),time:now(),agent,text});p.activity=p.activity.slice(-60);save()}
@@ -417,7 +412,7 @@ function downloadPdfDocument(){
   }
 }
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
-function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderFinalDocument();renderReport();renderNotifications()}
+function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderFinalDocument();renderReport();renderNotifications();updateResumeUI()}
 
 const OLLAMA_URL="http://127.0.0.1:11434";
 async function checkOllama(){
@@ -569,46 +564,78 @@ function makeRun(goal){const run={id:uid(),goal,created_at:now(),status:"running
 const row=(run,a)=>run.agents.find(x=>x.agent_id===a);
 function setA(run,a,p){Object.assign(row(run,a),p);save();renderAll()}
 async function doAgent(run,aid,goal){setA(run,aid,{status:"working",task:`Analyse : ${goal.slice(0,70)}`,progress:20,started_at:now(),reason:""});addActivity("commence son analyse",aid);addMessage("coordinator",aid,`Analyse cette mission : ${goal}`,"internal");try{const inbox=(project().messages||[]).filter(m=>m.channel==="internal"&&m.to===aid).slice(-8).map(m=>`${AGENTS[m.from]?.name||m.from}: ${m.body}`).join("\n");const out=await llm(AGENTS[aid].role+`\nSignale les blocages, distingue fait/hypothèse et ne prétends jamais qu\'une règle légale est satisfaite sans preuve.`,`MÉMOIRE DU PROJET:\n${memory()||"Aucune donnée"}\n\nMESSAGES REÇUS DU RÉSEAU IA:\n${inbox||"Aucun"}\n\nMISSION:\n${goal}\n\nFais uniquement ton analyse.`,650);const blocked=/donnée.{0,15}manquant|impossible|bloqu/i.test(out)&&memory().trim().length<40;setA(run,aid,{status:blocked?"blocked":"done",progress:100,output:out,finished_at:now(),reason:blocked?"Informations insuffisantes pour conclure.":""});addMessage(aid,"coordinator",out,"internal");addActivity(blocked?"signale un blocage":"termine son analyse",aid);return out}catch(e){const msg=e?.message||String(e),info=humanError(e);setA(run,aid,{status:"blocked",progress:100,output:info.message,reason:info.message,finished_at:now()});addNotification(aid,info.title,info.message,"error",info.action,msg);addMessage(aid,"user",`J’ai rencontré un problème : ${info.message} Je vais essayer de le corriger, et je te préviens si j’ai besoin de toi.`,"direct");renderChats();return "BLOCAGE "+AGENTS[aid].name+": "+info.message}}
-async function runMission(){
+async function runMission(options={}){
   if(running)return;
-  const goal=$("goal").value.trim();if(!goal)return showError("Écris la mission de l’équipe.");
-  running=true;showError("");$("runBtn").disabled=true;$("runBtn").textContent="Équipe en cours…";$("newTaskBtn").disabled=true;
-  const run=makeRun(goal);setA(run,"coordinator",{status:"working",task:"Prépare et distribue la mission",progress:20,started_at:now()});addActivity("prépare la mission");
+  const resume=!!options.resume,old=resume?latestRun():null;
+  const goal=(resume?(old?.goal||""):$("goal").value.trim()).trim();
+  if(!goal)return showError("Écris la mission de l’équipe.");
+
+  running=true;showError("");$("runBtn").disabled=true;$("runBtn").textContent=resume?"Reprise en cours…":"Équipe en cours…";$("newTaskBtn").disabled=true;
+  updateResumeUI();
+
+  let run;
+  if(resume&&old){
+    run=old;run.status="running";run.resumeAvailable=false;run.resumed_at=now();
+    for(const a of run.agents||[]){if(a.status==="blocked"&&/interrompue|pause|actualisation/i.test(a.reason||"")){a.status="waiting";a.reason="";a.finished_at=""}}
+    save();addActivity("reprend la mission après actualisation","coordinator");
+    addMessage("coordinator","user","Je reprends la mission là où elle s’était arrêtée. Je garde tout le travail déjà terminé.","direct");
+  }else{
+    run=makeRun(goal);setA(run,"coordinator",{status:"working",task:"Prépare et distribue la mission",progress:20,started_at:now()});addActivity("prépare la mission");
+  }
+
   try{
-    const p=await plan(goal);setA(run,"coordinator",{status:"done",progress:100,output:p.plan,finished_at:now()});
-    p.agents.forEach(a=>setA(run,a,{status:"waiting",task:"Attend son tour",progress:5}));
-    const results={},queue=[...p.agents],limit=Math.max(1,Math.min(3,Number(db.settings.parallel||2)));
-    async function worker(){
-      while(queue.length){
-        const a=queue.shift();if(!a)return;
-        results[a]=await doAgent(run,a,goal);
-      }
+    let agentIds=[];
+    if(resume){
+      agentIds=(run.agents||[]).filter(a=>SPECIALISTS.includes(a.agent_id)&&(a.status!=="done"||!a.output)).map(a=>a.agent_id);
+      if(!agentIds.length){const p=await plan(goal);agentIds=p.agents}
+      setA(run,"coordinator",{status:"done",progress:100,output:row(run,"coordinator")?.output||"Mission reprise.",finished_at:now()});
+    }else{
+      const p=await plan(goal);agentIds=p.agents;setA(run,"coordinator",{status:"done",progress:100,output:p.plan,finished_at:now()});
+      agentIds.forEach(a=>setA(run,a,{status:"waiting",task:"Attend son tour",progress:5}));
     }
-    await Promise.all(Array.from({length:Math.min(limit,queue.length)},()=>worker()));
+
+    const results={};
+    for(const a of (run.agents||[])){if(SPECIALISTS.includes(a.agent_id)&&a.status==="done"&&a.output)results[a.agent_id]=a.output}
+
+    const queue=agentIds.filter(a=>!results[a]),limit=Math.max(1,Math.min(3,Number(db.settings.parallel||2)));
+    async function worker(){while(queue.length){const a=queue.shift();if(!a)return;results[a]=await doAgent(run,a,goal)}}
+    if(queue.length)await Promise.all(Array.from({length:Math.min(limit,queue.length)},()=>worker()));
+
     const ids=Object.keys(results);
-    for(let i=0;i<ids.length-1;i++){const a=ids[i],next=ids[i+1],brief=strip(results[a]).replace(/\s+/g," ").slice(0,420);addMessage(a,next,`Transmission de travail : ${brief}`,"internal");}
+    for(let i=0;i<ids.length-1;i++){const a=ids[i],next=ids[i+1],brief=strip(results[a]).replace(/\s+/g," ").slice(0,420);addMessage(a,next,`Transmission de travail : ${brief}`,"internal")}
     Object.entries(results).forEach(([a,o])=>addMessage(a,"critic",`Pour contrôle : ${strip(o).replace(/\s+/g," ").slice(0,420)}`,"internal"));
-    setA(run,"critic",{status:"working",task:"Contrôle les analyses",progress:20,started_at:now()});
+
     const pack=Object.entries(results).map(([a,o])=>`### ${AGENTS[a].name}\n${o}`).join("\n\n");
-    const crit=await llm(AGENTS.critic.role,`MISSION:\n${goal}\n\nANALYSES:\n${pack}\n\nContrôle les contradictions et risques.`,500);
-    setA(run,"critic",{status:"done",progress:100,output:crit,finished_at:now()});addMessage("critic","verifier",`Contrôle terminé : ${strip(crit).replace(/\s+/g," ").slice(0,500)}`,"internal");
-    setA(run,"verifier",{status:"working",task:"Consolide le rapport final",progress:25,started_at:now()});
+    let crit=row(run,"critic")?.status==="done"&&row(run,"critic")?.output?row(run,"critic").output:"";
+    if(!crit){
+      setA(run,"critic",{status:"working",task:"Contrôle les analyses",progress:20,started_at:now(),reason:""});
+      crit=await llm(AGENTS.critic.role,`MISSION:\n${goal}\n\nANALYSES:\n${pack}\n\nContrôle les contradictions et risques.`,500);
+      setA(run,"critic",{status:"done",progress:100,output:crit,finished_at:now()});
+      addMessage("critic","verifier",`Contrôle terminé : ${strip(crit).replace(/\s+/g," ").slice(0,500)}`,"internal");
+    }
+
+    setA(run,"verifier",{status:"working",task:"Consolide le rapport final",progress:25,started_at:now(),reason:""});
     const final=await llm(AGENTS.verifier.role,`MISSION:\n${goal}\n\nMÉMOIRE ET FICHIERS:\n${memory()||"Aucune"}\n\nANALYSES:\n${pack}\n\nCRITIQUE:\n${crit}\n\nRédige un rapport clair avec RÉPONSE, CHIFFRES/HYPOTHÈSES, PROBLÈMES À CORRIGER, DÉCISIONS POUR FABIEN, PROCHAINE ACTION.`,850);
-    setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
-    run.final_report=final;run.status="done";if(!project().finalDocHtml)project().finalDocHtml=plainTextToHtml(final);save();addActivity("rapport final terminé","verifier");addMessage("coordinator","user","L’équipe a terminé la mission. J’ai aussi placé le résultat dans le Document final, que tu peux modifier et exporter en Word ou PDF.","direct");renderAll();
+    setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});
+    addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
+    run.final_report=final;run.status="done";run.resumeAvailable=false;if(!project().finalDocHtml)project().finalDocHtml=plainTextToHtml(final);
+    save();addActivity("rapport final terminé","verifier");
+    addMessage("coordinator","user",resume?"La mission a repris et l’équipe vient de terminer le travail.":"L’équipe a terminé la mission. J’ai aussi placé le résultat dans le Document final, que tu peux modifier et exporter en Word ou PDF.","direct");
+    renderAll();
   }catch(e){
     const info=humanError(e);
-    for(const a of run.agents||[]){
-      if(a.status==="working"||a.status==="waiting"){
-        a.status="blocked";a.reason=info.message;a.output=a.output||info.message;a.finished_at=now();
-      }
-    }
-    run.status="error";run.final_report=info.message;save();showError("");
-    addNotification("coordinator",info.title,info.message,"error",info.action,String(e?.message||e));
-    addMessage("coordinator","user",`Je n’ai pas pu terminer la mission : ${info.message} J’ai arrêté proprement les agents concernés pour qu’aucun ne reste affiché en train de travailler. Tu peux ensuite réparer et relancer.`,"direct");
-    renderAll()
+    for(const a of run.agents||[]){if(a.status==="working"||a.status==="waiting"){a.status="waiting";a.reason="Mission mise en pause. Tu peux appuyer sur Reprendre.";a.finished_at=""}}
+    run.status="paused";run.resumeAvailable=true;run.final_report=info.message;save();showError("");
+    addNotification("coordinator",info.title,info.message,"error","open-agent",String(e?.message||e));
+    addMessage("coordinator","user","La mission s’est arrêtée, mais le travail déjà terminé est conservé. Appuie sur « Reprendre » ou sur la touche R pour continuer.","direct");
+    renderAll();
+  }finally{
+    running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false;updateResumeUI();
   }
-  finally{running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false}
+}
+async function resumeLastMission(){
+  const run=latestRun();if(!run||!["paused","interrupted","error"].includes(run.status))return;
+  $("goal").value=run.goal||"";await runMission({resume:true});
 }
 function looksLikeMission(text){
   return /\b(fais|faire|prépare|préparer|analyse|analyser|lance|lancer|travaille|travailler|avance|avancer|continue|continuer|crée|créer|refais|revoir|vérifie|vérifier|organise|organiser|construis|construire|mets à jour|mettre à jour)\b/i.test(text);
@@ -649,6 +676,15 @@ $("modelSelect").onchange=()=>{db.settings.model=$("modelSelect").value;if(db.se
 $("parallel").value=String(db.settings.parallel||2);
 $("parallel").onchange=()=>{db.settings.parallel=Number($("parallel").value);save()};
 $("runBtn").onclick=runMission;$("newTaskBtn").onclick=()=>{$("goal").focus();$("goal").scrollIntoView({behavior:"smooth",block:"center"})};
+$("resumeBtn").onclick=resumeLastMission;
+$("resumeInlineBtn").onclick=resumeLastMission;
+document.addEventListener("keydown",e=>{
+  const tag=(document.activeElement?.tagName||"").toLowerCase(),typing=["input","textarea","select"].includes(tag)||document.activeElement?.isContentEditable;
+  if(!typing&&e.key.toLowerCase()==="r"&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+    const run=latestRun();if(run&&["paused","interrupted","error"].includes(run.status)){e.preventDefault();resumeLastMission()}
+  }
+});
+
 $("memoryBtn").onclick=()=>{$("memoryDrawer").classList.toggle("open");renderProjectFiles()};
 $("saveMemory").onclick=()=>{const t=$("memoryText").value.trim();if(!t)return;project().memory+=(project().memory?"\n\n":"")+t;save();$("memoryText").value="";addActivity("mémoire du projet mise à jour");renderAll()};
 $("fileInput").onchange=e=>handleFiles(e.target.files);
