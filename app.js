@@ -422,21 +422,84 @@ function saveFinalDocument(){
   const p=project();p.finalDocTitle=$("finalDocTitle").value.trim()||"Dossier final";p.finalDocHtml=$("finalDocEditor").innerHTML;save();
   $("finalDocStatus").textContent="Enregistré ✓";setTimeout(()=>{$("finalDocStatus").textContent="Enregistré localement"},1200);
 }
+function investorCoreContext(){
+  const p=project();
+  const mem=String(p.memory||"").slice(0,1800);
+  const master=String(p.masterDossier||"").slice(0,2600);
+  const last=String(p.runs?.slice(-1)[0]?.final_report||"").slice(0,1600);
+  const web=(p.webMemory||[]).slice(-18).map(x=>`[${x.category||"Web"}] ${x.fact}\nSource: ${x.title||x.url} — ${x.url}`).join("\n").slice(0,3800);
+  return [
+    mem&&`MÉMOIRE DU PROJET:\n${mem}`,
+    master&&`DOSSIER MAÎTRE:\n${master}`,
+    web&&`DONNÉES WEB SOURCÉES:\n${web}`,
+    last&&`DERNIER RAPPORT:\n${last}`
+  ].filter(Boolean).join("\n\n").slice(0,9000);
+}
+async function generateInvestorSection(spec,context,index,total){
+  $("finalDocStatus").textContent=`Le Chef prépare le dossier investisseur — section ${index}/${total} : ${spec.title}…`;
+  const role=AGENTS[spec.agent]?.role||AGENTS.coordinator.role;
+  const prompt=`CONTEXTE FIABLE DU PROJET:\n${context}\n\nSECTION À RÉDIGER: ${spec.title}\nOBJECTIF: ${spec.instructions}\n\nRègles absolues:\n- Écris uniquement cette section, sans répéter les autres.\n- N’invente aucun chiffre.\n- Quand une donnée est incertaine, écris clairement « À confirmer ».\n- Utilise les données Web uniquement si leur source est présente dans le contexte.\n- Quand tu utilises une donnée Web, mentionne la source entre parenthèses avec son URL.\n- Ne parle jamais des erreurs de lecture de fichiers, des prompts, de l’IA ou du processus interne.\n- Style professionnel, concret, destiné à un investisseur.\n- Pas de Markdown # dans le titre : commence directement par le contenu de la section.\n- Maximum 450 mots.`;
+  return await llm(role+" Tu contribues à un dossier d’investissement professionnel.",prompt,650);
+}
 async function generateFinalDocument(){
-  const p=project(),source=[p.masterDossier||"",project()?.runs?.slice(-1)[0]?.final_report||"",projectContext()].filter(Boolean).join("\n\n").slice(0,15000);
-  if(!source.trim()){$("finalDocStatus").textContent="Aucune matière à transformer en document.";return}
-  $("finalDocStatus").textContent="Le Chef rédige le document final…";
+  const p=project();
+  if(!String(p.masterDossier||p.memory||projectContext()).trim()){
+    $("finalDocStatus").textContent="Aucune matière à transformer en document.";return;
+  }
+  if(!engineReady&&!(await ensureModel()))return;
+
   try{
-    const out=await llm(
-      AGENTS.coordinator.role+" Tu rédiges un document final professionnel, clair, crédible et présentable. Structure avec titres et sous-titres. N’invente rien.",
-      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant un vrai document final destiné à un investisseur. Commence par un résumé exécutif, puis concept, besoin marché, expérience client, fonctionnement, espaces, modèle économique, revenus/coûts disponibles, équipe/opérations, risques, hypothèses à confirmer et prochaines étapes. Utilise seulement # et ## pour les titres, des listes quand utile. Ne recopie pas les notes brutes et ne montre jamais les symboles Markdown dans le texte final. N’invente aucun chiffre manquant. Utilise en priorité la MÉMOIRE WEB PERMANENTE et les recherches Internet enregistrées dans le projet pour rendre le dossier réaliste. Ajoute une section SOURCES avec les liens utilisés et ne supprime pas une information utile simplement parce qu’elle vient d’une recherche plus ancienne.`,
-      1400
-    );
-    p.finalDocTitle=p.finalDocTitle||"Dossier final";
-    p.finalDocHtml=plainTextToHtml(out);
-    save();renderFinalDocument();$("finalDocStatus").textContent="✓ Document créé par le Chef";
-    addMessage("coordinator","user","J’ai créé le document final. Tu peux maintenant le modifier directement dans l’éditeur puis l’exporter en Word ou PDF.","direct");renderChats();
-  }catch(e){$("finalDocStatus").textContent="Erreur pendant la création : "+(e?.message||e)}
+    if(String(db.settings.tavilyKey||"").trim()){
+      $("finalDocStatus").textContent="Recherche Internet avant rédaction…";
+      await runWebResearch("dossier investisseur centre de récupération guidée clinique intégrée Montréal Québec",{silent:true});
+    }
+
+    const context=investorCoreContext();
+    const sections=[
+      {title:"Résumé exécutif",agent:"investor",instructions:"Présente en 3 à 5 paragraphes le concept, le problème résolu, la différenciation, le modèle général et pourquoi le projet peut devenir une opportunité d’investissement. Le lecteur doit comprendre le projet sans avoir lu le reste."},
+      {title:"Problème, solution et expérience client",agent:"product",instructions:"Explique le problème de fragmentation des services, la proposition de valeur, le parcours client, la logique guidée, la clinique intégrée et ce qui rend l’expérience différente des spas, studios et cliniques classiques."},
+      {title:"Marché, concurrence et positionnement",agent:"marketing",instructions:"Analyse le marché pertinent à Montréal/Québec à partir des sources Web disponibles. Présente concurrence directe/indirecte, tendances, clientèle cible et positionnement. Ne donne aucun chiffre de marché non sourcé."},
+      {title:"Modèle opérationnel, espaces et capacité",agent:"operations",instructions:"Décris comment le centre fonctionnerait concrètement: parcours, clinique, zones, circulation, horaires, capacité, personnel, locations et dépendances opérationnelles. Utilise les données connues du projet; marque À confirmer si une donnée manque."},
+      {title:"Modèle économique et rentabilité",agent:"finance",instructions:"Présente clairement les sources de revenus, prix connus, commissions, locations, coûts connus, logique de marge et scénarios disponibles. Sépare chiffres confirmés, hypothèses et éléments à chiffrer. Ne crée aucun nouveau chiffre."},
+      {title:"Stratégie commerciale et croissance",agent:"marketing",instructions:"Explique acquisition clients, rétention, fréquence de visite, partenariats, entreprises, professionnels de santé, offres complémentaires et potentiel de croissance. Reste réaliste et mesurable."},
+      {title:"Risques, réglementation et points à valider",agent:"critic",instructions:"Présente les principaux risques financiers, opérationnels, réglementaires, immobiliers, assurantiels et de marché. Distingue ce qui est connu de ce qui doit être validé par un professionnel ou une source officielle."},
+      {title:"Plan de lancement, besoins d’investissement et prochaines étapes",agent:"investor",instructions:"Présente les étapes de validation, recherche de local, budget à établir, travaux, recrutement, préouverture, indicateurs à suivre et informations qu’un investisseur demandera encore. Ne chiffre pas le besoin d’investissement s’il n’est pas fourni."}
+    ];
+
+    const parts=[];
+    for(let i=0;i<sections.length;i++){
+      const spec=sections[i];
+      let out=await generateInvestorSection(spec,context,i+1,sections.length);
+      if(!String(out||"").trim())out="À compléter à partir des données validées du projet.";
+      parts.push(`## ${spec.title}\n\n${out.trim()}`);
+    }
+
+    const sourceItems=(p.webMemory||[]).slice(-30);
+    const unique=new Map();
+    for(const x of sourceItems){if(x.url&&!unique.has(x.url))unique.set(x.url,x)}
+    let sources="## Sources et références\n\n";
+    if(unique.size){
+      let n=1;
+      for(const x of unique.values()){
+        sources+=`${n}. ${x.title||domainOf(x.url)} — ${x.url}\n`;n++;
+      }
+    }else{
+      sources+="Aucune source Internet enregistrée. Les données de marché et réglementaires doivent être complétées avant présentation externe.";
+    }
+
+    const header=`# ${p.finalDocTitle&&p.finalDocTitle!=="Dossier final"?p.finalDocTitle:"Dossier investisseur — "+(p.name||"Projet")}\n\nDocument de travail destiné à la préparation d’une présentation investisseur. Les données identifiées « À confirmer » doivent être validées avant diffusion externe.\n\n`;
+    const finalText=header+parts.join("\n\n")+ "\n\n"+sources;
+
+    p.finalDocTitle=p.finalDocTitle&&p.finalDocTitle!=="Dossier final"?p.finalDocTitle:"Dossier investisseur — "+(p.name||"Projet");
+    p.finalDocHtml=plainTextToHtml(finalText);
+    save();renderFinalDocument();
+    $("finalDocStatus").textContent="✓ Dossier investisseur construit section par section";
+    addMessage("coordinator","user","J’ai reconstruit le dossier investisseur section par section avec les agents spécialisés. Les informations non confirmées sont indiquées comme telles et les sources Web sont conservées à la fin.","direct");
+    renderChats();
+  }catch(e){
+    $("finalDocStatus").textContent="La création s’est interrompue. Tu peux relancer : "+(e?.message||e);
+    addNotification("coordinator","Dossier investisseur interrompu","Le document n’a pas été terminé. Les données du projet sont conservées; relance « Créer avec le Chef ».","warning","open-agent",String(e?.message||e));
+  }
 }
 function downloadWordDocument(){
   saveFinalDocument();const p=project(),title=p.finalDocTitle||"Dossier final";
@@ -445,14 +508,32 @@ function downloadWordDocument(){
   a.href=url;a.download=title.replace(/[^a-z0-9_-]+/gi,"-")+".doc";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
 }
 function downloadPdfDocument(){
-  saveFinalDocument();const p=project(),node=$("finalDocEditor").cloneNode(true),wrap=document.createElement("div");
-  wrap.style.background="white";wrap.style.color="#111";wrap.style.padding="32px";wrap.appendChild(node);node.style.boxShadow="none";node.style.margin="0 auto";node.style.minHeight="auto";
+  saveFinalDocument();
+  const p=project(),title=p.finalDocTitle||"Dossier final";
+  const wrap=document.createElement("div");
+  wrap.style.cssText="background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.5;width:180mm;margin:0;padding:0;";
+  wrap.innerHTML=`<h1 style="font-size:24pt;margin:0 0 18px">${esc(title)}</h1>${p.finalDocHtml||""}`;
+  wrap.querySelectorAll("h1").forEach((x,i)=>{if(i>0)x.style.pageBreakBefore="auto";x.style.fontSize="22pt";x.style.margin="20px 0 10px"});
+  wrap.querySelectorAll("h2").forEach(x=>{x.style.fontSize="16pt";x.style.margin="20px 0 8px";x.style.pageBreakAfter="avoid"});
+  wrap.querySelectorAll("h3").forEach(x=>{x.style.fontSize="13pt";x.style.margin="16px 0 6px";x.style.pageBreakAfter="avoid"});
+  wrap.querySelectorAll("p,li").forEach(x=>{x.style.orphans="3";x.style.widows="3"});
+
   if(window.html2pdf){
-    window.html2pdf().set({margin:10,filename:(p.finalDocTitle||"Dossier-final").replace(/[^a-z0-9_-]+/gi,"-")+".pdf",image:{type:"jpeg",quality:.98},html2canvas:{scale:2},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}}).from(wrap).save();
+    window.html2pdf().set({
+      margin:[14,15,14,15],
+      filename:title.replace(/[^a-z0-9_-]+/gi,"-")+".pdf",
+      image:{type:"jpeg",quality:.98},
+      html2canvas:{scale:2,backgroundColor:"#ffffff",useCORS:true},
+      jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+      pagebreak:{mode:["css","legacy"],avoid:["h1","h2","h3"]}
+    }).from(wrap).save();
   }else{
-    const w=window.open("","_blank");w.document.write("<html><body>"+wrap.innerHTML+"</body></html>");w.document.close();w.print();
+    const w=window.open("","_blank");
+    w.document.write("<html><head><title>"+esc(title)+"</title></head><body>"+wrap.innerHTML+"</body></html>");
+    w.document.close();w.print();
   }
 }
+
 
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
 function webCategory(text){
