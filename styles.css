@@ -126,3 +126,15 @@
 @media(max-width:1350px){.agentGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard{grid-template-columns:minmax(0,1.5fr) minmax(300px,.75fr)}}
 @media(max-width:1050px){.dashboard,.lower{grid-template-columns:1fr}.agentGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.detail{min-height:auto}}
 @media(max-width:760px){.statusGrid,.projectInfoGrid{grid-template-columns:1fr}.agentGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.missionLine{grid-template-columns:1fr}.boardStats{justify-content:flex-start}.boardHeader{display:block}.topControls{flex-wrap:wrap}}
+
+
+/* v2.1 — dossier complet au Chef */
+.folderDrop{display:block;margin-top:8px;border:1px solid #2d5778;background:linear-gradient(145deg,#0b1b2c,#0a1623);border-radius:12px;padding:15px;text-align:center;color:#e4effb;cursor:pointer;font-size:12px;font-weight:800}
+.folderDrop:hover{border-color:#4ca4ff;background:#10243a}
+.folderDrop .tiny{display:block;margin-top:4px;font-weight:500}
+.folderStatus{min-height:18px;margin-top:7px;font-size:10px;color:#9cc3e8}
+.masterDossier{margin-top:12px;padding:15px;min-height:180px}
+.masterDossier .reportText{max-height:500px;overflow:auto;background:#07111e;border:1px solid #1d3856;border-radius:12px;padding:14px}
+.masterActions{display:flex;gap:7px;flex-wrap:wrap}
+#masterDossierStatus{margin-bottom:8px;color:#9fc0df}
+@media(max-width:760px){.masterActions{width:100%;margin-top:8px}.masterActions button{flex:1}.masterDossier .panelTitle{display:block}}
