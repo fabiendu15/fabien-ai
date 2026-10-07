@@ -356,23 +356,56 @@ function downloadMasterDossier(){
 }
 
 function escHtmlText(t){return String(t||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function inlineMarkdown(text){
+  return escHtmlText(text)
+    .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+    .replace(/__([^_]+)__/g,"<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g,"<em>$1</em>");
+}
 function plainTextToHtml(text){
   const lines=String(text||"").split(/\n/),out=[];let inUl=false,inOl=false;
   const close=()=>{if(inUl){out.push("</ul>");inUl=false}if(inOl){out.push("</ol>");inOl=false}};
   for(const raw of lines){
     const line=raw.trim();
     if(!line){close();out.push("<p><br></p>");continue}
-    if(/^#{1,3}\s+/.test(line)){close();const n=Math.min(3,(line.match(/^#+/)||[""])[0].length);out.push(`<h${n}>${escHtmlText(line.replace(/^#{1,3}\s+/,""))}</h${n}>`);continue}
-    if(/^\d+[.)]\s+/.test(line)){if(inUl){out.push("</ul>");inUl=false}if(!inOl){out.push("<ol>");inOl=true}out.push("<li>"+escHtmlText(line.replace(/^\d+[.)]\s+/,""))+"</li>");continue}
-    if(/^[-•*]\s+/.test(line)){if(inOl){out.push("</ol>");inOl=false}if(!inUl){out.push("<ul>");inUl=true}out.push("<li>"+escHtmlText(line.replace(/^[-•*]\s+/,""))+"</li>");continue}
-    close();out.push("<p>"+escHtmlText(line)+"</p>");
+    if(/^#{1,6}\s+/.test(line)){
+      close();
+      const level=(line.match(/^#+/)||[""])[0].length;
+      const tag=level===1?"h1":level===2?"h2":"h3";
+      out.push(`<${tag}>${inlineMarkdown(line.replace(/^#{1,6}\s+/,""))}</${tag}>`);
+      continue;
+    }
+    if(/^Document\s*:/i.test(line)){close();out.push("<h2>"+inlineMarkdown(line)+"</h2>");continue}
+    if(/^\d+[.)]\s+/.test(line)){
+      if(inUl){out.push("</ul>");inUl=false}
+      if(!inOl){out.push("<ol>");inOl=true}
+      out.push("<li>"+inlineMarkdown(line.replace(/^\d+[.)]\s+/,""))+"</li>");continue
+    }
+    if(/^[-•*]\s+/.test(line)){
+      if(inOl){out.push("</ol>");inOl=false}
+      if(!inUl){out.push("<ul>");inUl=true}
+      out.push("<li>"+inlineMarkdown(line.replace(/^[-•*]\s+/,""))+"</li>");continue
+    }
+    close();out.push("<p>"+inlineMarkdown(line)+"</p>");
   }
   close();return out.join("");
+}
+function cleanSavedFinalDocHtml(html){
+  let x=String(html||"");
+  x=x.replace(/<p>\s*#{1,6}\s+([\s\S]*?)<\/p>/gi,(m,t)=>"<h3>"+t+"</h3>");
+  x=x.replace(/<p>\s*(Document\s*:[\s\S]*?)<\/p>/gi,(m,t)=>"<h2>"+t+"</h2>");
+  x=x.replace(/\*\*([^*<]+)\*\*/g,"<strong>$1</strong>");
+  x=x.replace(/__([^_<]+)__/g,"<strong>$1</strong>");
+  return x;
 }
 function renderFinalDocument(){
   const p=project(),ed=$("finalDocEditor"),title=$("finalDocTitle");
   if(!ed||!title)return;
   title.value=p.finalDocTitle||"Dossier final";
+  if(p.finalDocHtml){
+    const cleaned=cleanSavedFinalDocHtml(p.finalDocHtml);
+    if(cleaned!==p.finalDocHtml){p.finalDocHtml=cleaned;save()}
+  }
   ed.innerHTML=p.finalDocHtml||plainTextToHtml(p.masterDossier||"")||"<h1>Dossier final</h1><p>Le Chef peut créer ici le document final du projet.</p>";
   $("finalDocStatus").textContent=p.finalDocHtml?"Enregistré localement":"Prêt à être créé";
 }
@@ -387,7 +420,7 @@ async function generateFinalDocument(){
   try{
     const out=await llm(
       AGENTS.coordinator.role+" Tu rédiges un document final professionnel, clair, crédible et présentable. Structure avec titres et sous-titres. N’invente rien.",
-      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant le document final complet. Utilise des titres Markdown # et ##, des listes quand utile, et une rédaction propre prête à être présentée.`,
+      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant un vrai document final destiné à un investisseur. Commence par un résumé exécutif, puis concept, besoin marché, expérience client, fonctionnement, espaces, modèle économique, revenus/coûts disponibles, équipe/opérations, risques, hypothèses à confirmer et prochaines étapes. Utilise seulement # et ## pour les titres, des listes quand utile. Ne recopie pas les notes brutes et ne montre jamais les symboles Markdown dans le texte final. N’invente aucun chiffre manquant.`,
       1400
     );
     p.finalDocTitle=p.finalDocTitle||"Dossier final";
