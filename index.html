@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261007-0825">
+<link rel="stylesheet" href="./styles.css?v=20261007-0845">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.4</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.5</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -29,8 +29,8 @@
   <button id="newTaskBtn" class="newTask">▶ Lancer l’équipe</button>
 </header>
 <section class="setupBanner compactSetup">
-  <div><strong>Moteur IA local</strong><span id="setupText">Ollama + Qwen3 4B en priorité. Le navigateur sert seulement de secours.</span></div>
-  <div class="setupActions"><select id="modelSelect" class="select"><option value="ollama:qwen3:4b" selected>⭐ Ollama · Qwen3 4B</option><option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Secours navigateur · 1,5B</option><option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Secours navigateur · 3B</option></select><button id="loadModelBtn" class="primary">Connecter l’IA</button></div>
+  <div><strong>IA dans Chrome</strong><span id="setupText">Fonctionne directement sur ce site tant que ton ordinateur et cette page sont ouverts.</span></div>
+  <div class="setupActions"><select id="modelSelect" class="select"><option value="Qwen2.5-3B-Instruct-q4f16_1-MLC" selected>⭐ Qualité · 3B</option><option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Plus léger · 1,5B</option></select><button id="loadModelBtn" class="primary">Charger l’IA</button></div>
   <div class="loadRow"><div class="loadBar"><div id="loadBarFill"></div></div><span id="loadPct">0 %</span></div>
 </section>
 
@@ -147,7 +147,7 @@
   <div id="notificationList" class="notificationList"></div>
   <button id="clearNotifications" class="ghost notificationClear">Tout marquer comme lu</button>
 </div>
-<div id="privacyModal" class="modal hidden"><div class="modalCard"><button id="closePrivacy" class="modalClose">×</button><h2>Confidentialité</h2><p>Fabien AI n’utilise aucune API payante. Les projets, conversations et rapports sont stockés dans ce navigateur. Le modèle s’exécute localement via WebGPU.</p><p>Le dépôt GitHub contient seulement le code. Les agents ne remplacent pas les professionnels réglementés et doivent signaler quand une validation externe est nécessaire.</p><button id="clearLocal" class="danger">Effacer toutes les données locales</button></div></div>
+<div id="privacyModal" class="modal hidden"><div class="modalCard"><button id="closePrivacy" class="modalClose">×</button><h2>Confidentialité</h2><p>Fabien AI n’utilise aucune API payante. Les projets, conversations et rapports sont stockés dans ce navigateur. Le modèle s’exécute directement dans Chrome via WebGPU tant que cette page reste ouverte.</p><p>Le dépôt GitHub contient seulement le code. Les agents ne remplacent pas les professionnels réglementés et doivent signaler quand une validation externe est nécessaire.</p><button id="clearLocal" class="danger">Effacer toutes les données locales</button></div></div>
 <div id="optimizerModal" class="modal hidden">
     <div class="modalCard optimizerCard">
       <button id="closeOptimizer" class="modalClose">×</button>
@@ -180,5 +180,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js?v=20261007-0825"></script>
+<script type="module" src="./app.js?v=20261007-0845"></script>
 </body></html>
