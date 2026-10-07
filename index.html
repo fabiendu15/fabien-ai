@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261006-2005">
+<link rel="stylesheet" href="./styles.css?v=20261006-2035">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.0</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.1</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -48,9 +48,12 @@
         <button id="saveMemory" class="ghost">Enregistrer la mémoire</button>
       </div>
       <div>
-        <div class="drawerTitle">Fichiers du projet</div>
-        <label class="fileDrop" for="fileInput">＋ Ajouter des fichiers<div class="tiny">TXT, MD, CSV, JSON, PDF · lus localement</div></label>
-        <input id="fileInput" type="file" multiple accept=".txt,.md,.csv,.json,.pdf,text/plain,text/csv,application/json,application/pdf" hidden>
+        <div class="drawerTitle">Documents du projet</div>
+        <label class="fileDrop" for="fileInput">＋ Ajouter des fichiers<div class="tiny">PDF, Word, Excel, TXT, MD, CSV, JSON · lus localement</div></label>
+        <input id="fileInput" type="file" multiple accept=".txt,.md,.csv,.json,.pdf,.docx,.xlsx,text/plain,text/csv,application/json,application/pdf" hidden>
+        <label class="folderDrop" for="folderInput">📁 Envoyer un dossier complet au Chef<div class="tiny">Le Chef analyse les documents puis construit un dossier maître.</div></label>
+        <input id="folderInput" type="file" webkitdirectory directory multiple hidden>
+        <div id="folderStatus" class="folderStatus"></div>
         <div id="projectFiles" class="projectFiles"></div>
       </div>
     </div>
@@ -122,7 +125,18 @@
     <div id="activityList" hidden></div>
   </section>
 </div>
-<section class="panel report"><div class="panelTitle"><span>Rapport final</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
+<section class="panel masterDossier">
+  <div class="panelTitle">
+    <div><span>📁 Dossier maître du Chef</span><div class="tiny">Synthèse structurée de tout ce que tu as confié au projet.</div></div>
+    <div class="masterActions">
+      <button id="buildMasterDossier" class="ghost small">↻ Construire / mettre à jour</button>
+      <button id="downloadMasterDossier" class="ghost small">↓ Télécharger .md</button>
+    </div>
+  </div>
+  <div id="masterDossierStatus" class="tiny"></div>
+  <div id="masterDossierText" class="reportText">Aucun dossier maître créé.</div>
+</section>
+<section class="panel report"><div class="panelTitle"><span>Rapport de la dernière mission</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
 </main></div>
 <div id="privacyModal" class="modal hidden"><div class="modalCard"><button id="closePrivacy" class="modalClose">×</button><h2>Confidentialité</h2><p>Fabien AI n’utilise aucune API payante. Les projets, conversations et rapports sont stockés dans ce navigateur. Le modèle s’exécute localement via WebGPU.</p><p>Le dépôt GitHub contient seulement le code. Les agents ne remplacent pas les professionnels réglementés et doivent signaler quand une validation externe est nécessaire.</p><button id="clearLocal" class="danger">Effacer toutes les données locales</button></div></div>
 <div id="optimizerModal" class="modal hidden">
@@ -157,5 +171,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js?v=20261006-2005"></script>
+<script type="module" src="./app.js?v=20261006-2035"></script>
 </body></html>
