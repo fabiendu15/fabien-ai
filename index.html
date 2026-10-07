@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261007-0915">
+<link rel="stylesheet" href="./styles.css?v=20261007-0940">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.6</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.7</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -26,7 +26,7 @@
     </select>
     <button id="memoryBtn" class="ghost">＋ Infos du projet</button><button id="notificationBtn" class="notificationBtn" title="Notifications">🔔<span id="notificationCount" class="notificationCount hidden">0</span></button>
   </div>
-  <button id="newTaskBtn" class="newTask">▶ Lancer l’équipe</button>
+  <div class="headerRunActions"><button id="resumeBtn" class="resumeBtn" hidden>▶ Reprendre <span class="resumeKey">R</span></button><button id="newTaskBtn" class="newTask">▶ Lancer l’équipe</button></div>
 </header>
 <section class="setupBanner compactSetup">
   <div><strong>IA dans Chrome</strong><span id="setupText">Fonctionne directement sur ce site tant que ton ordinateur et cette page sont ouverts.</span></div>
@@ -39,7 +39,7 @@
     <textarea id="goal" placeholder="Écris la mission de l’équipe…"></textarea>
     <button id="runBtn" class="primary">▶ Lancer</button>
   </div>
-  <div id="error" class="error"></div>
+  <div id="resumeInfo" class="resumeInfo" hidden><b>Mission en pause.</b> La page a été actualisée. Les résultats déjà terminés sont conservés. <button id="resumeInlineBtn">▶ Reprendre maintenant</button></div><div id="error" class="error"></div>
   <div id="memoryDrawer" class="memoryDrawer">
     <div class="projectInfoGrid">
       <div>
@@ -224,5 +224,5 @@
     </div>
   </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>\n<script type="module" src="./app.js?v=20261007-0915"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>\n<script type="module" src="./app.js?v=20261007-0940"></script>
 </body></html>
