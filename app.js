@@ -31,14 +31,14 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const strip=s=>String(s??"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<\/think>/gi,"").replace(/^\s*(Let me|We need|I need|I will)[^\n]*\n+/i,"").trim();
 const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"})};
 
-function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-1.5B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
+function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-1.5B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
 function loadDB(){
   try{
     const base=baseDB(),saved=JSON.parse(localStorage.getItem(DBKEY)||"{}"),merged={...base,...saved};
     if(!Array.isArray(merged.projects)||merged.projects.length===0)merged.projects=base.projects;
     merged.projects=merged.projects.map(p=>({
       id:p.id||uid(),name:p.name||"Mon projet",description:p.description||"Projet local",
-      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],created_at:p.created_at||now(),
+      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],folderBriefs:Array.isArray(p.folderBriefs)?p.folderBriefs:[],masterDossier:p.masterDossier||"",created_at:p.created_at||now(),
       runs:Array.isArray(p.runs)?p.runs:[],messages:Array.isArray(p.messages)?p.messages:[],activity:Array.isArray(p.activity)?p.activity:[]
     }));
     if(!merged.projects.some(p=>p.id===merged.selectedProject))merged.selectedProject=merged.projects[0].id;
@@ -162,16 +162,28 @@ function projectContext(){
   return [p.memory||"",files].filter(Boolean).join("\n\n").slice(0,180000);
 }
 async function readProjectFile(file){
-  const ext=file.name.split(".").pop().toLowerCase();
-  if(file.size>8*1024*1024)throw new Error(file.name+" est trop volumineux (8 Mo max).");
+  const ext=(file.name.split(".").pop()||"").toLowerCase();
+  if(file.size>12*1024*1024)throw new Error(file.name+" est trop volumineux (12 Mo max par fichier).");
   if(ext==="pdf"){
     const pdfjs=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
     pdfjs.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
     const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;let out="";
-    for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i),tc=await pg.getTextContent();out+=tc.items.map(x=>x.str).join(" ")+"\n";if(out.length>120000)break}
-    return out.slice(0,120000);
+    for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i),tc=await pg.getTextContent();out+=tc.items.map(x=>x.str).join(" ")+"\n";if(out.length>140000)break}
+    return out.slice(0,140000);
   }
-  return (await file.text()).slice(0,120000);
+  if(ext==="docx"){
+    const mammoth=await import("https://esm.sh/mammoth@1.9.0");
+    const res=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return String(res.value||"").slice(0,140000);
+  }
+  if(ext==="xlsx"){
+    const XLSX=await import("https://esm.sh/xlsx@0.18.5");
+    const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});let out="";
+    for(const name of wb.SheetNames){out+="\n## "+name+"\n"+XLSX.utils.sheet_to_csv(wb.Sheets[name])+"\n";if(out.length>140000)break}
+    return out.slice(0,140000);
+  }
+  if(["txt","md","csv","json"].includes(ext)||file.type.startsWith("text/"))return (await file.text()).slice(0,140000);
+  return "";
 }
 async function handleFiles(files){
   const p=project();p.files=p.files||[];
