@@ -159,9 +159,11 @@ function renderProjectFiles(){
 }
 function projectContext(){
   const p=project();
-  const files=(p.files||[]).map(f=>`### Fichier: ${f.name}\n${f.text||""}`).join("\n\n");
-  const folder=(p.folderBriefs||[]).map(f=>`### Dossier: ${f.path}\n${f.summary||""}`).join("\n\n");
-  return [p.memory||"",folder,p.masterDossier||"",files].filter(Boolean).join("\n\n").slice(0,180000);
+  const memoryText=String(p.memory||"").slice(0,3500);
+  const master=String(p.masterDossier||"").slice(0,5500);
+  const folder=(p.folderBriefs||[]).slice(-20).map(f=>`• ${f.path}: ${String(f.summary||"").replace(/\s+/g," ").slice(0,420)}`).join("\n").slice(0,5000);
+  const files=(p.files||[]).slice(-12).map(f=>`• ${f.name}: ${String(f.text||"").replace(/\s+/g," ").slice(0,350)}`).join("\n").slice(0,3500);
+  return [memoryText&&`MÉMOIRE:\n${memoryText}`,master&&`DOSSIER MAÎTRE:\n${master}`,folder&&`FICHIERS DU DOSSIER (résumés):\n${folder}`,files&&`AUTRES FICHIERS:\n${files}`].filter(Boolean).join("\n\n").slice(0,14500);
 }
 async function readProjectFile(file){
   const ext=(file.name.split(".").pop()||"").toLowerCase();
@@ -203,11 +205,11 @@ function renderMasterDossier(){
   if(status&&p.masterDossier&&!status.textContent)status.textContent="✓ Dossier maître disponible.";
 }
 async function summarizeForChief(name,text){
-  const excerpt=String(text||"").trim().slice(0,22000);
+  const excerpt=String(text||"").trim().slice(0,6500);
   if(!excerpt)return "Fichier non lisible automatiquement.";
   return await llm(
     AGENTS.coordinator.role+" Tu prépares un dossier maître. Résume fidèlement ce document, sans rien inventer.",
-    `DOCUMENT: ${name}\n\nCONTENU:\n${excerpt}\n\nDonne: faits importants, chiffres, décisions/contraintes, questions ou incohérences, éléments à conserver. Maximum 350 mots.`,
+    `DOCUMENT: ${name}\n\nCONTENU:\n${excerpt}\n\nDonne: faits importants, chiffres, décisions/contraintes, questions ou incohérences, éléments à conserver. Maximum 180 mots.`,
     520
   );
 }
@@ -215,42 +217,65 @@ async function processFolderWithChief(files){
   const list=[...files].filter(f=>!f.name.startsWith(".")).slice(0,40);
   if(!list.length)return;
   const p=project();p.folderBriefs=[];
+  const folderName=(list[0].webkitRelativePath||"").split("/")[0]||"dossier";
+  addMessage("coordinator","user",`J’ai bien reçu le dossier « ${folderName} » avec ${list.length} fichier${list.length>1?"s":""}. Je vais les lire un par un, puis je te prépare une synthèse propre.`,"direct");
+  renderChats();
   $("folderStatus").textContent=`Chef : préparation de ${list.length} fichier(s)…`;
-  if(!await ensureModel()){ $("folderStatus").textContent="Impossible de charger l’IA locale."; return; }
+  if(!await ensureModel()){
+    $("folderStatus").textContent="Impossible de charger l’IA locale.";
+    addMessage("coordinator","user","Je n’arrive pas à lancer le moteur local pour analyser le dossier. Recharge l’IA locale puis renvoie-moi le dossier.","direct");
+    renderChats(); return;
+  }
+  let readable=0;
   for(let i=0;i<list.length;i++){
     const file=list[i],path=file.webkitRelativePath||file.name;
     $("folderStatus").textContent=`Chef : analyse ${i+1}/${list.length} — ${path}`;
     try{
       const text=await readProjectFile(file);
-      const summary=await summarizeForChief(path,text);
-      p.folderBriefs.push({path,name:file.name,summary,time:now()});
+      if(!String(text||"").trim()){
+        p.folderBriefs.push({path,name:file.name,summary:"Fichier reçu mais aucun texte lisible automatiquement.",time:now()});
+      }else{
+        const summary=await summarizeForChief(path,text);
+        p.folderBriefs.push({path,name:file.name,summary,time:now()});readable++;
+      }
     }catch(e){
       p.folderBriefs.push({path,name:file.name,summary:"Erreur de lecture : "+(e?.message||e),time:now()});
     }
     save();
   }
-  $("folderStatus").textContent=`✓ ${p.folderBriefs.length} fichier(s) analysé(s). Construction du dossier maître…`;
+  $("folderStatus").textContent=`✓ ${readable}/${list.length} fichier(s) lus. Construction du dossier maître…`;
   await buildMasterDossier();
   $("folderStatus").textContent="✓ Dossier analysé et dossier maître créé par le Chef.";
+  addMessage("coordinator","user",`C’est bon, j’ai terminé. J’ai pu lire ${readable} fichier${readable>1?"s":""} sur ${list.length}. J’ai organisé les informations dans le Dossier maître du Chef. Tu peux maintenant me poser des questions dessus normalement.`,"direct");
   addActivity("a analysé un dossier complet","coordinator");
   renderAll();
 }
 async function buildMasterDossier(){
   const p=project();
-  const summaries=(p.folderBriefs||[]).map(x=>`### ${x.path}\n${x.summary}`).join("\n\n");
-  const manual=(p.files||[]).map(x=>`### ${x.name}\n${String(x.text||"").slice(0,10000)}`).join("\n\n");
-  const source=[
-    p.memory?`## Mémoire du projet\n${p.memory}`:"",
-    summaries?`## Résumés du dossier\n${summaries}`:"",
-    manual?`## Fichiers ajoutés\n${manual}`:""
-  ].filter(Boolean).join("\n\n");
-  if(!source.trim()){ $("masterDossierStatus").textContent="Ajoute d’abord un dossier, des fichiers ou des informations au projet.";return; }
-  $("masterDossierStatus").textContent="Le Chef construit le dossier maître…";
+  const briefs=(p.folderBriefs||[]).map(x=>`### ${x.path}\n${x.summary}`);
+  const manual=(p.files||[]).slice(-12).map(x=>`### ${x.name}\n${String(x.text||"").slice(0,3500)}`);
+  const pieces=[];
+  if(p.memory)pieces.push(`## Mémoire du projet\n${String(p.memory).slice(0,4500)}`);
+  pieces.push(...briefs,...manual);
+  if(!pieces.length){$("masterDossierStatus").textContent="Ajoute d’abord un dossier, des fichiers ou des informations au projet.";return;}
+  $("masterDossierStatus").textContent="Le Chef organise le dossier maître…";
   if(!await ensureModel()){ $("masterDossierStatus").textContent="IA locale non disponible.";return; }
+
+  const batches=[];
+  for(let i=0;i<pieces.length;i+=5){
+    const batch=pieces.slice(i,i+5).join("\n\n").slice(0,12500);
+    const compact=await llm(
+      AGENTS.coordinator.role+" Tu consolides plusieurs résumés de documents sans inventer. Garde uniquement les informations utiles et précises.",
+      `CONTENU:\n${batch}\n\nCrée une synthèse intermédiaire courte avec: faits, chiffres, décisions, contraintes, risques, informations manquantes et noms des sources.`,
+      650
+    );
+    batches.push(compact);
+  }
+  const combined=batches.join("\n\n---\n\n").slice(0,13500);
   const out=await llm(
-    AGENTS.coordinator.role+" Tu dois produire un dossier professionnel, extrêmement clair, structuré et exploitable. Distingue les faits des hypothèses et n’invente rien.",
-    `SOURCE DU PROJET:\n${source.slice(0,90000)}\n\nCrée le DOSSIER MAÎTRE avec exactement cette structure:\n1. RÉSUMÉ EXÉCUTIF\n2. OBJECTIF DU PROJET\n3. FAITS ET DONNÉES CONFIRMÉES\n4. CHIFFRES CLÉS\n5. DÉCISIONS DÉJÀ PRISES\n6. CONTRAINTES\n7. ORGANISATION / STRUCTURE\n8. POINTS À VÉRIFIER\n9. CONTRADICTIONS OU RISQUES\n10. INFORMATIONS MANQUANTES\n11. PROCHAINES DÉCISIONS À PRENDRE\n12. PLAN D’ACTION PRIORISÉ\n13. SOURCES / DOCUMENTS UTILISÉS\n\nSois carré, concis et professionnel. Indique clairement « non fourni » quand une information manque.`,
-    1500
+    AGENTS.coordinator.role+" Tu produis un dossier professionnel, extrêmement clair, structuré et exploitable. Tu distingues les faits des hypothèses et tu n’inventes rien.",
+    `SYNTHÈSES DU PROJET:\n${combined}\n\nCrée le DOSSIER MAÎTRE avec cette structure:\n1. RÉSUMÉ EXÉCUTIF\n2. OBJECTIF DU PROJET\n3. FAITS ET DONNÉES CONFIRMÉES\n4. CHIFFRES CLÉS\n5. DÉCISIONS DÉJÀ PRISES\n6. CONTRAINTES\n7. ORGANISATION / STRUCTURE\n8. POINTS À VÉRIFIER\n9. CONTRADICTIONS OU RISQUES\n10. INFORMATIONS MANQUANTES\n11. PROCHAINES DÉCISIONS À PRENDRE\n12. PLAN D’ACTION PRIORISÉ\n13. SOURCES / DOCUMENTS UTILISÉS\n\nSois carré, concis et professionnel. Écris « non fourni » quand une information manque.`,
+    1350
   );
   p.masterDossier=out;save();$("masterDossierStatus").textContent="✓ Dossier maître à jour.";renderMasterDossier();
 }
@@ -303,7 +328,27 @@ async function runMission(){
   }catch(e){run.status="error";run.final_report="Erreur locale : "+(e?.message||e);save();showError(run.final_report);renderAll()}
   finally{running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false}
 }
-async function sendDirect(sourceId="directInput"){const inp=$(sourceId),msg=inp.value.trim();if(!msg)return;inp.value="";addMessage("user",selectedAgent,msg,"direct");renderChats();renderConversationModal();$("directOnline").textContent="● réfléchit…";try{const recent=(project().messages||[]).filter(m=>m.channel==="direct"&&(m.from===selectedAgent||m.to===selectedAgent)).slice(-12).map(m=>`${m.from==="user"?"Fabien":AGENTS[m.from]?.name||m.from}: ${m.body}`).join("\n"),network=(project().messages||[]).filter(m=>m.channel==="internal"&&(m.from===selectedAgent||m.to===selectedAgent)).slice(-8).map(m=>`${AGENTS[m.from]?.name||m.from} → ${AGENTS[m.to]?.name||m.to}: ${m.body}`).join("\n"),reply=await llm(AGENTS[selectedAgent].role,`MÉMOIRE:\n${memory()||"Aucune"}\n\nRÉSEAU IA RÉCENT:\n${network||"Aucun"}\n\nDISCUSSION AVEC FABIEN:\n${recent}\n\nRéponds directement à Fabien.`,420);addMessage(selectedAgent,"user",reply,"direct");renderChats();renderConversationModal()}catch(e){addMessage(selectedAgent,"user","Erreur locale : "+(e?.message||e),"direct");renderChats();renderConversationModal()}finally{$("directOnline").textContent="● disponible"}}
+async function sendDirect(sourceId="directInput"){
+  const inp=$(sourceId),msg=inp.value.trim();if(!msg)return;
+  inp.value="";addMessage("user",selectedAgent,msg,"direct");renderChats();renderConversationModal();$("directOnline").textContent="● réfléchit…";
+  try{
+    const recent=(project().messages||[]).filter(m=>m.channel==="direct"&&(m.from===selectedAgent||m.to===selectedAgent)).slice(-10).map(m=>`${m.from==="user"?"Fabien":AGENTS[m.from]?.name||m.from}: ${String(m.body).slice(0,1200)}`).join("\n");
+    const network=(project().messages||[]).filter(m=>m.channel==="internal"&&(m.from===selectedAgent||m.to===selectedAgent)).slice(-5).map(m=>`${AGENTS[m.from]?.name||m.from} → ${AGENTS[m.to]?.name||m.to}: ${String(m.body).slice(0,500)}`).join("\n");
+    const context=projectContext().slice(0,11000);
+    const persona=`Tu es ${AGENTS[selectedAgent].name}, un membre de l’équipe de Fabien. Réponds toujours en français naturel, chaleureux et direct, comme un excellent assistant humain. Pas de jargon inutile, pas de phrases robotiques, pas de méta-commentaires sur le modèle. Ne fais pas de long rapport sauf si Fabien le demande. Si tu connais la réponse grâce aux documents du projet, réponds simplement et cite le nom du document quand c’est utile. Si une information manque, dis-le clairement au lieu d’inventer.`;
+    const reply=await llm(
+      AGENTS[selectedAgent].role+"\n"+persona,
+      `CONTEXTE DU PROJET:\n${context||"Aucun contexte enregistré."}\n\nRÉSEAU IA RÉCENT:\n${network||"Aucun"}\n\nCONVERSATION RÉCENTE:\n${recent}\n\nRéponds au dernier message de Fabien de façon naturelle et concise.`,
+      500
+    );
+    addMessage(selectedAgent,"user",reply,"direct");renderChats();renderConversationModal();
+  }catch(e){
+    const raw=String(e?.message||e);
+    const friendly=/context window|prompt tokens|4096/i.test(raw)?"J’ai trop d’informations chargées en même temps. Je vais utiliser les résumés du dossier plutôt que tout le texte brut. Réessaie ta question.":"J’ai eu un problème local pendant ma réponse. Réessaie dans un instant.";
+    addMessage(selectedAgent,"user",friendly,"direct");renderChats();renderConversationModal();
+  }finally{$("directOnline").textContent="● disponible"}
+}
+
 
 $("loadModelBtn").onclick=ensureModel;
 $("modelSelect").value=db.settings.model||"Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
