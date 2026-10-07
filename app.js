@@ -48,8 +48,8 @@ function loadDB(){
 }
 let db=loadDB();
 db.optimizer=db.optimizer||[];
-save();
 const save=()=>localStorage.setItem(DBKEY,JSON.stringify(db));
+save();
 const project=()=>db.projects.find(p=>p.id===currentProjectId)||db.projects[0];
 function showError(m=""){$("error").textContent=m;$("error").classList.toggle("show",!!m)}
 function stateRows(){const p=project(),run=p?.runs?.[p.runs.length-1],m={};Object.keys(AGENTS).forEach(a=>m[a]={agent_id:a,status:"resting",task:"",progress:0,output:"",started_at:"",finished_at:"",reason:""});(run?.agents||[]).forEach(r=>m[r.agent_id]={...m[r.agent_id],...r});return m}
