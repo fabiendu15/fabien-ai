@@ -138,3 +138,18 @@
 .masterActions{display:flex;gap:7px;flex-wrap:wrap}
 #masterDossierStatus{margin-bottom:8px;color:#9fc0df}
 @media(max-width:760px){.masterActions{width:100%;margin-top:8px}.masterActions button{flex:1}.masterDossier .panelTitle{display:block}}
+
+
+/* v2.2 notifications des agents */
+.notificationBtn{position:relative;border:1px solid #2a4867;background:#091725;color:#dbe8f5;border-radius:10px;padding:8px 10px;min-width:42px}
+.notificationBtn:hover{border-color:#4ca4ff}
+.notificationCount{position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ff4f62;color:#fff;font-size:10px;font-weight:900;display:grid;place-items:center;border:2px solid #081421}
+.notificationCount.hidden{display:none}
+.toastStack{position:fixed;right:18px;top:18px;z-index:1600;display:grid;gap:10px;width:min(390px,calc(100vw - 30px));pointer-events:none}
+.agentToast{pointer-events:auto;border:1px solid #2a4b6d;background:linear-gradient(145deg,#0c1a2a,#08121f);border-radius:14px;padding:12px;box-shadow:0 20px 55px #0008}
+.agentToast.error{border-color:#74303d}.agentToast.warning{border-color:#70511d}.agentToast.success{border-color:#24634f}
+.agentToastHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.agentToastWho{display:flex;align-items:center;gap:9px}.agentToastOrb{width:26px;height:26px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c)}
+.agentToast h4{margin:0;font-size:12px}.agentToast p{margin:7px 0 0;font-size:11px;line-height:1.45;color:#c3d1e0}.agentToastActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.agentToastActions button{border-radius:8px;padding:6px 8px;border:1px solid #2b4968;background:#0a1726;color:#dce8f4;font-size:10px}.agentToastActions .primaryFix{background:#2de2a0;color:#06150f;border-color:transparent;font-weight:800}
+.notificationCenter{position:fixed;right:18px;top:72px;z-index:1550;width:min(460px,calc(100vw - 30px));max-height:78vh;background:#0a1524;border:1px solid #294966;border-radius:15px;box-shadow:0 24px 70px #0009;padding:14px;overflow:hidden}
+.notificationCenter.hidden{display:none}.notificationHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:10px;border-bottom:1px solid #1d324b}.notificationHeader .modalClose{position:static}.notificationList{display:grid;gap:8px;max-height:60vh;overflow:auto;padding:10px 2px}.notificationItem{border:1px solid #1f3955;border-radius:11px;padding:10px;background:#081421}.notificationItem.unread{border-color:#4b6f96;background:#0c1b2d}.notificationItemTop{display:flex;justify-content:space-between;gap:8px}.notificationItem b{font-size:11px}.notificationItem time{font-size:9px;color:#7690ab}.notificationItem p{margin:6px 0 0;font-size:10.5px;line-height:1.45;color:#bbcad9}.notificationItemActions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.notificationItemActions button{border:1px solid #294761;background:#0a1726;color:#dbe7f3;border-radius:8px;padding:5px 7px;font-size:9.5px}.notificationClear{width:100%;margin-top:7px}
+@media(max-width:760px){.toastStack{right:10px;top:10px;width:calc(100vw - 20px)}.notificationCenter{right:10px;top:62px;width:calc(100vw - 20px)}}
