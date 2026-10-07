@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261007-0800">
+<link rel="stylesheet" href="./styles.css?v=20261007-0825">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.3</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.4</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -29,8 +29,8 @@
   <button id="newTaskBtn" class="newTask">▶ Lancer l’équipe</button>
 </header>
 <section class="setupBanner compactSetup">
-  <div><strong>IA gratuite dans Chrome</strong><span id="setupText">Le modèle se télécharge une seule fois, puis travaille sur ce Mac.</span></div>
-  <div class="setupActions"><select id="modelSelect" class="select"><option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Rapide · 0,5B</option><option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC" selected>Équilibré · 1,5B</option><option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qualité · 3B</option></select><button id="loadModelBtn" class="primary">Charger l’IA locale</button></div>
+  <div><strong>Moteur IA local</strong><span id="setupText">Ollama + Qwen3 4B en priorité. Le navigateur sert seulement de secours.</span></div>
+  <div class="setupActions"><select id="modelSelect" class="select"><option value="ollama:qwen3:4b" selected>⭐ Ollama · Qwen3 4B</option><option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Secours navigateur · 1,5B</option><option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Secours navigateur · 3B</option></select><button id="loadModelBtn" class="primary">Connecter l’IA</button></div>
   <div class="loadRow"><div class="loadBar"><div id="loadBarFill"></div></div><span id="loadPct">0 %</span></div>
 </section>
 
@@ -180,5 +180,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js?v=20261007-0800"></script>
+<script type="module" src="./app.js?v=20261007-0825"></script>
 </body></html>
