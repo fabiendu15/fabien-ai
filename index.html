@@ -4,52 +4,123 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261006-1810">
+<link rel="stylesheet" href="./styles.css?v=20261006-2005">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v1.4</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.0</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
-  <div class="sidebarBottom"><div class="localStatus"><span id="engineDot" class="statusDot"></span><span id="engineText">IA locale non chargée</span></div><button id="privacyBtn" class="privacyBtn">🔒 Confidentialité</button></div>
+  <div class="sidebarBottom"><div class="localStatus"><span id="engineDot" class="statusDot"></span><span id="engineText">IA locale non chargée</span></div><button id="privacyBtn" class="privacyBtn">🔒 Confidentialité</button><div class="userTile"><span>F</span><div><b>Fabien</b><small>Propriétaire</small></div></div></div>
 </aside>
 <main class="main">
+
 <header class="header">
-  <div><h1>Salle des agents IA</h1><div id="projectTitle" class="headerSub">Projet local</div></div>
-  <div class="headRight"><span id="activeCount" class="chip good">● 0 agent actif</span><span id="blockedCount" class="chip">0 blocage</span><span class="chip">🔒 local</span><button id="newTaskBtn" class="newTask">＋ Nouvelle mission</button></div>
+  <div class="topControls">
+    <select id="parallel" class="select agentSelect">
+      <option value="1">⚡ 1 agent</option>
+      <option value="2" selected>⚡ 2 agents</option>
+      <option value="3">⚡ 3 agents</option>
+    </select>
+    <button id="memoryBtn" class="ghost">＋ Infos du projet</button>
+  </div>
+  <button id="newTaskBtn" class="newTask">▶ Lancer l’équipe</button>
 </header>
-<section class="setupBanner">
+<section class="setupBanner compactSetup">
   <div><strong>IA gratuite dans Chrome</strong><span id="setupText">Le modèle se télécharge une seule fois, puis travaille sur ce Mac.</span></div>
   <div class="setupActions"><select id="modelSelect" class="select"><option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Rapide · 0,5B</option><option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC" selected>Équilibré · 1,5B</option><option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qualité · 3B</option></select><button id="loadModelBtn" class="primary">Charger l’IA locale</button></div>
   <div class="loadRow"><div class="loadBar"><div id="loadBarFill"></div></div><span id="loadPct">0 %</span></div>
 </section>
+
 <section class="taskBox">
-  <textarea id="goal" placeholder="Ex. Analyse mon projet, vérifie les chiffres et les points bloquants."></textarea>
-  <div class="taskActions"><div class="taskLeft"><select id="parallel" class="select"><option value="1">⚡ 1 agent</option><option value="2" selected>⚡ 2 agents</option><option value="3">⚡ 3 agents</option></select><button id="memoryBtn" class="ghost">＋ Infos du projet</button></div><button id="runBtn" class="primary">▶ Lancer l’équipe</button></div>
+  <div class="missionLine">
+    <textarea id="goal" placeholder="Écris la mission de l’équipe…"></textarea>
+    <button id="runBtn" class="primary">▶ Lancer</button>
+  </div>
   <div id="error" class="error"></div>
-  <div id="memoryDrawer" class="memoryDrawer"><textarea id="memoryText" placeholder="Ajoute ici les chiffres, contraintes et décisions utiles..."></textarea><button id="saveMemory" class="ghost">Enregistrer dans la mémoire locale</button></div>
+  <div id="memoryDrawer" class="memoryDrawer">
+    <div class="projectInfoGrid">
+      <div>
+        <div class="drawerTitle">Mémoire du projet</div>
+        <textarea id="memoryText" placeholder="Ajoute les décisions, chiffres et contraintes utiles au projet…"></textarea>
+        <button id="saveMemory" class="ghost">Enregistrer la mémoire</button>
+      </div>
+      <div>
+        <div class="drawerTitle">Fichiers du projet</div>
+        <label class="fileDrop" for="fileInput">＋ Ajouter des fichiers<div class="tiny">TXT, MD, CSV, JSON, PDF · lus localement</div></label>
+        <input id="fileInput" type="file" multiple accept=".txt,.md,.csv,.json,.pdf,text/plain,text/csv,application/json,application/pdf" hidden>
+        <div id="projectFiles" class="projectFiles"></div>
+      </div>
+    </div>
+  </div>
 </section>
+
 <div class="dashboard">
-<section class="panel room">
-  <div class="roomHead"><span class="pulseDot"></span><span id="roomStatus">Équipe disponible</span></div>
-  <div class="zone work"><span>TRAVAILLE</span></div><div class="zone wait"><span>EN ATTENTE</span></div><div class="zone block"><span>BLOQUÉ</span></div><div class="zone rest"><span>SE REPOSE</span></div>
-  <div class="path p1"></div><div class="path p2"></div><div class="path p3"></div><div class="path p4"></div><div id="orbs"></div>
+
+<section class="panel room board">
+  <div class="boardHeader">
+    <div>
+      <div class="boardTitle">Équipe d’agents</div>
+      <div class="boardSub">Organisez et suivez tous vos agents en temps réel.</div>
+    </div>
+    <div class="boardStats">
+      <span id="roomStatus" class="chip good">Équipe disponible</span>
+      <span id="activeCount" class="chip">0 agent actif</span>
+      <span id="blockedCount" class="chip">0 blocage</span>
+    </div>
+  </div>
+  <div class="statusGrid">
+    <div class="statusBucket workBucket">
+      <div class="bucketHead"><span>▣ TRAVAILLE</span><b id="count-working">0</b></div>
+      <div id="status-working" class="agentGrid"></div>
+    </div>
+    <div class="statusBucket waitBucket">
+      <div class="bucketHead"><span>⌛ EN ATTENTE</span><b id="count-waiting">0</b></div>
+      <div id="status-waiting" class="agentGrid"></div>
+    </div>
+    <div class="statusBucket blockBucket">
+      <div class="bucketHead"><span>● BLOQUÉ</span><b id="count-blocked">0</b></div>
+      <div id="status-blocked" class="agentGrid"></div>
+    </div>
+    <div class="statusBucket restBucket">
+      <div class="bucketHead"><span>● SE REPOSE</span><b id="count-resting">0</b></div>
+      <div id="status-resting" class="agentGrid"></div>
+    </div>
+  </div>
 </section>
 <aside class="panel detail">
   <div class="detailTop"><b>Agent sélectionné</b><span class="tiny">clic = suivre</span></div>
-  <div class="selectedName"><div id="miniOrb" class="miniOrb"></div><div><strong id="agentName">Chef</strong><div id="agentState" class="stateBadge">Se repose</div></div></div>
+  <div class="selectedName"><div id="miniOrb" class="miniOrb"></div><div><div class="agentNameRow"><strong id="agentName">Chef</strong><div id="agentState" class="stateBadge">Se repose</div></div><div id="agentRole" class="agentRole">Agent principal</div></div></div>
   <div class="facts"><div class="fact"><span>Tâche actuelle</span><b id="agentTask">Aucune mission</b></div><div class="fact"><span>Depuis</span><b id="agentSince">Disponible</b></div><div class="fact"><span>Étape suivante</span><b id="agentNext">Attend une mission</b></div></div>
   <div class="progressLabel"><span>Progression</span><b id="agentProgressText">0 %</b></div><div class="progress"><div id="agentProgress"></div></div>
-  <div class="detailBtns"><button id="talkFocus" class="talkBtn">💬 Parler</button><button id="historyFocus">↻ Historique</button></div>
+  <div class="detailBtns"><button id="talkFocus" class="talkBtn">💬 Parler</button><button id="historyFocus">◷ Historique</button></div>
   <div id="blocker" class="blocker"></div><div class="outputPeek"><h3>DERNIER TRAVAIL</h3><div id="agentOutput">Cet agent se repose.</div></div>
 </aside>
 </div>
+
 <div class="lower">
-<section class="panel lowerPanel"><div class="panelTitle">Activité en temps réel</div><div id="activityList" class="activityList"><div class="empty">Aucune activité.</div></div></section>
-<section id="directPanel" class="panel lowerPanel"><div class="panelTitle"><span id="directTitle">Parler au Chef</span><span class="panelActions"><span id="directOnline" class="tiny">● disponible</span><button class="chatExpand" data-open-chat="direct">⤢ Agrandir</button></span></div><div id="directChat" class="chatBody"></div><div class="chatInput"><input id="directInput" placeholder="Écrire un message..."><button id="sendDirect">➤</button></div></section>
-<section id="chiefPanel" class="panel lowerPanel"><div class="panelTitle"><span>🔗 Réseau IA</span><button class="chatExpand" data-open-chat="network">⤢ Agrandir</button></div><div id="chiefChat" class="chatBody"></div></section>
+  <section id="directPanel" class="panel lowerPanel conversationPanel">
+    <div class="panelTitle">
+      <div><span>💬 Conversation avec l’agent</span><div id="directSubtitle" class="tiny">Discutez directement avec l’agent sélectionné.</div></div>
+      <span class="panelActions"><span id="directOnline" class="tiny">● disponible</span><button class="chatExpand" data-open-chat="direct">⤢ Agrandir</button></span>
+    </div>
+    <div id="directChat" class="chatBody"></div>
+    <div class="chatInput">
+      <button id="attachChat" class="attachBtn" title="Ajouter un fichier">⌕</button>
+      <input id="directInput" placeholder="Écrire un message…">
+      <button id="sendDirect">➤</button>
+    </div>
+  </section>
+  <section id="chiefPanel" class="panel lowerPanel networkPanel">
+    <div class="panelTitle">
+      <div><span>🔗 Réseau IA</span><div class="tiny">Les échanges entre agents apparaissent ici en temps réel.</div></div>
+      <select id="networkFilter" class="miniSelect"><option value="all">Tous les agents</option><option value="selected">Agent sélectionné</option></select>
+    </div>
+    <div id="chiefChat" class="networkFeed"></div>
+    <div id="activityList" hidden></div>
+  </section>
 </div>
 <section class="panel report"><div class="panelTitle"><span>Rapport final</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
 </main></div>
@@ -86,5 +157,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js?v=20261006-1810"></script>
+<script type="module" src="./app.js?v=20261006-2005"></script>
 </body></html>
