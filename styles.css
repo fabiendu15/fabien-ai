@@ -153,3 +153,17 @@
 .notificationCenter{position:fixed;right:18px;top:72px;z-index:1550;width:min(460px,calc(100vw - 30px));max-height:78vh;background:#0a1524;border:1px solid #294966;border-radius:15px;box-shadow:0 24px 70px #0009;padding:14px;overflow:hidden}
 .notificationCenter.hidden{display:none}.notificationHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:10px;border-bottom:1px solid #1d324b}.notificationHeader .modalClose{position:static}.notificationList{display:grid;gap:8px;max-height:60vh;overflow:auto;padding:10px 2px}.notificationItem{border:1px solid #1f3955;border-radius:11px;padding:10px;background:#081421}.notificationItem.unread{border-color:#4b6f96;background:#0c1b2d}.notificationItemTop{display:flex;justify-content:space-between;gap:8px}.notificationItem b{font-size:11px}.notificationItem time{font-size:9px;color:#7690ab}.notificationItem p{margin:6px 0 0;font-size:10.5px;line-height:1.45;color:#bbcad9}.notificationItemActions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.notificationItemActions button{border:1px solid #294761;background:#0a1726;color:#dbe7f3;border-radius:8px;padding:5px 7px;font-size:9.5px}.notificationClear{width:100%;margin-top:7px}
 @media(max-width:760px){.toastStack{right:10px;top:10px;width:calc(100vw - 20px)}.notificationCenter{right:10px;top:62px;width:calc(100vw - 20px)}}
+
+
+/* v2.6 document final éditable */
+.finalDocumentPanel{margin-top:12px;padding:15px}
+.finalDocTop{align-items:flex-start;gap:12px}.finalDocActions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.finalDocMeta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0}
+.finalDocTitle{flex:1;max-width:520px;background:#091523;border:1px solid #28445f;color:#eef6ff;border-radius:10px;padding:9px 11px;font-size:14px;font-weight:800}
+.wordToolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#0a1726;border:1px solid #203b59;border-radius:10px;padding:8px;margin-bottom:10px}
+.wordToolbar button{border:1px solid #294a69;background:#0b1b2d;color:#dce8f4;border-radius:8px;padding:6px 8px;font-size:10px}
+.wordToolbar button:hover{border-color:#4ca4ff}.toolbarSep{width:1px;height:24px;background:#25405a;margin:0 2px}
+.paperStage{background:#050b13;border:1px solid #1e3550;border-radius:12px;padding:22px;overflow:auto}
+.finalDocEditor{width:min(860px,100%);min-height:980px;margin:0 auto;background:white;color:#17202a;padding:70px 74px;box-shadow:0 14px 50px #0008;outline:none;font-family:Arial,Helvetica,sans-serif;line-height:1.55;font-size:14px}
+.finalDocEditor h1{font-size:28px;margin:0 0 22px;color:#111827}.finalDocEditor h2{font-size:20px;margin:26px 0 10px;color:#1f2937}.finalDocEditor h3{font-size:16px;margin:20px 0 8px}.finalDocEditor p{margin:0 0 11px}.finalDocEditor ul,.finalDocEditor ol{margin:8px 0 14px 24px}
+@media(max-width:760px){.finalDocTop{display:block}.finalDocActions{justify-content:flex-start;margin-top:8px}.finalDocMeta{display:block}.finalDocTitle{max-width:none;width:100%;margin-bottom:7px}.paperStage{padding:8px}.finalDocEditor{padding:34px 24px;min-height:760px}}
