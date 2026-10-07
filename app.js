@@ -31,14 +31,14 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const strip=s=>String(s??"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<\/think>/gi,"").replace(/^\s*(Let me|We need|I need|I will)[^\n]*\n+/i,"").trim();
 const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"})};
 
-function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-3B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",webResearch:[],finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
+function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-3B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",webResearch:[],webMemory:[],finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
 function loadDB(){
   try{
     const base=baseDB(),saved=JSON.parse(localStorage.getItem(DBKEY)||"{}"),merged={...base,...saved};
     if(!Array.isArray(merged.projects)||merged.projects.length===0)merged.projects=base.projects;
     merged.projects=merged.projects.map(p=>({
       id:p.id||uid(),name:p.name||"Mon projet",description:p.description||"Projet local",
-      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],folderBriefs:Array.isArray(p.folderBriefs)?p.folderBriefs:[],masterDossier:p.masterDossier||"",webResearch:Array.isArray(p.webResearch)?p.webResearch:[],finalDocTitle:p.finalDocTitle||"Dossier final",finalDocHtml:p.finalDocHtml||"",created_at:p.created_at||now(),
+      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],folderBriefs:Array.isArray(p.folderBriefs)?p.folderBriefs:[],masterDossier:p.masterDossier||"",webResearch:Array.isArray(p.webResearch)?p.webResearch:[],webMemory:Array.isArray(p.webMemory)?p.webMemory:[],finalDocTitle:p.finalDocTitle||"Dossier final",finalDocHtml:p.finalDocHtml||"",created_at:p.created_at||now(),
       runs:Array.isArray(p.runs)?p.runs:[],messages:Array.isArray(p.messages)?p.messages:[],activity:Array.isArray(p.activity)?p.activity:[]
     }));
     if(!merged.projects.some(p=>p.id===merged.selectedProject))merged.selectedProject=merged.projects[0].id;
@@ -227,16 +227,18 @@ function renderProjectFiles(){
 }
 function projectContext(){
   const p=project();
-  const memoryText=String(p.memory||"").slice(0,2200);
-  const master=String(p.masterDossier||"").slice(0,3200);
-  const folder=(p.folderBriefs||[]).slice(-12).map(f=>`• ${f.path}: ${String(f.summary||"").replace(/\s+/g," ").slice(0,260)}`).join("\n").slice(0,2600);
-  const files=(p.files||[]).slice(-8).map(f=>`• ${f.name}: ${String(f.text||"").replace(/\s+/g," ").slice(0,260)}`).join("\n").slice(0,1800);
-  const web=(p.webResearch||[]).slice(-12).map(r=>`• ${r.title} — ${r.url}\n  ${String(r.content||"").replace(/\s+/g," ").slice(0,300)}`).join("\n").slice(0,4200);
+  const memoryText=String(p.memory||"").slice(0,1800);
+  const master=String(p.masterDossier||"").slice(0,2600);
+  const webMemory=(p.webMemory||[]).slice(-24).map(x=>`• [${x.category||"Web"}] ${x.fact} — Source: ${x.title||x.url} (${x.url})`).join("\n").slice(0,4600);
+  const web=(p.webResearch||[]).slice(-6).map(r=>`• ${r.title} — ${r.url}\n  ${String(r.content||"").replace(/\s+/g," ").slice(0,220)}`).join("\n").slice(0,1800);
+  const folder=(p.folderBriefs||[]).slice(-10).map(f=>`• ${f.path}: ${String(f.summary||"").replace(/\s+/g," ").slice(0,220)}`).join("\n").slice(0,2200);
+  const files=(p.files||[]).slice(-6).map(f=>`• ${f.name}: ${String(f.text||"").replace(/\s+/g," ").slice(0,220)}`).join("\n").slice(0,1200);
   return [
     memoryText&&`MÉMOIRE:\n${memoryText}`,
     master&&`DOSSIER MAÎTRE:\n${master}`,
-    web&&`RECHERCHE INTERNET SOURCÉE:\n${web}`,
-    folder&&`FICHIERS DU DOSSIER (résumés):\n${folder}`,
+    webMemory&&`MÉMOIRE WEB PERMANENTE ET SOURCÉE:\n${webMemory}`,
+    web&&`RECHERCHE INTERNET RÉCENTE:\n${web}`,
+    folder&&`FICHIERS DU DOSSIER:\n${folder}`,
     files&&`AUTRES FICHIERS:\n${files}`
   ].filter(Boolean).join("\n\n").slice(0,10500);
 }
@@ -427,7 +429,7 @@ async function generateFinalDocument(){
   try{
     const out=await llm(
       AGENTS.coordinator.role+" Tu rédiges un document final professionnel, clair, crédible et présentable. Structure avec titres et sous-titres. N’invente rien.",
-      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant un vrai document final destiné à un investisseur. Commence par un résumé exécutif, puis concept, besoin marché, expérience client, fonctionnement, espaces, modèle économique, revenus/coûts disponibles, équipe/opérations, risques, hypothèses à confirmer et prochaines étapes. Utilise seulement # et ## pour les titres, des listes quand utile. Ne recopie pas les notes brutes et ne montre jamais les symboles Markdown dans le texte final. N’invente aucun chiffre manquant. Utilise les recherches Internet enregistrées dans le projet pour rendre le dossier réaliste et ajoute une section SOURCES avec les liens utilisés.`,
+      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant un vrai document final destiné à un investisseur. Commence par un résumé exécutif, puis concept, besoin marché, expérience client, fonctionnement, espaces, modèle économique, revenus/coûts disponibles, équipe/opérations, risques, hypothèses à confirmer et prochaines étapes. Utilise seulement # et ## pour les titres, des listes quand utile. Ne recopie pas les notes brutes et ne montre jamais les symboles Markdown dans le texte final. N’invente aucun chiffre manquant. Utilise en priorité la MÉMOIRE WEB PERMANENTE et les recherches Internet enregistrées dans le projet pour rendre le dossier réaliste. Ajoute une section SOURCES avec les liens utilisés et ne supprime pas une information utile simplement parce qu’elle vient d’une recherche plus ancienne.`,
       1400
     );
     p.finalDocTitle=p.finalDocTitle||"Dossier final";
@@ -453,16 +455,55 @@ function downloadPdfDocument(){
 }
 
 function domainOf(url){try{return new URL(url).hostname.replace(/^www\./,"")}catch{return ""}}
+function webCategory(text){
+  const t=String(text||"").toLowerCase();
+  if(/loyer|immobilier|pi²|pied carré|commercial/.test(t))return "Immobilier";
+  if(/salaire|emploi|main.d.?œuvre|staff|personnel/.test(t))return "Salaires";
+  if(/règlement|reglement|loi|norme|permis|gouvernement|québec|canada/.test(t))return "Réglementation";
+  if(/marché|marche|croissance|industrie|tendance|demande/.test(t))return "Marché";
+  if(/prix|coût|cout|budget|revenu|marge|finance/.test(t))return "Finance";
+  if(/concurrent|spa|clinique|centre|studio/.test(t))return "Concurrence";
+  return "Projet";
+}
+function rememberWebResults(results){
+  const p=project();p.webMemory=p.webMemory||[];
+  const byUrl=new Map(p.webMemory.map(x=>[x.url,x]));
+  for(const r of results||[]){
+    if(!r?.url||!String(r.content||"").trim())continue;
+    const old=byUrl.get(r.url);
+    const entry={
+      id:old?.id||uid(),
+      title:r.title||r.url,
+      url:r.url,
+      fact:String(r.content||"").replace(/\s+/g," ").trim().slice(0,520),
+      category:webCategory((r.title||"")+" "+(r.content||"")),
+      query:r.query||old?.query||"",
+      saved_at:old?.saved_at||now(),
+      updated_at:now()
+    };
+    byUrl.set(r.url,entry);
+  }
+  p.webMemory=[...byUrl.values()].slice(-120);save();
+}
+function removeWebMemory(id){
+  const p=project();p.webMemory=(p.webMemory||[]).filter(x=>x.id!==id);save();renderWebResearch();
+}
 function renderWebResearch(){
   const p=project(),list=$("webResearchSources"),status=$("researchMissionStatus"),badge=$("webResearchBadge"),key=$("tavilyKey");
   const hasKey=!!String(db.settings.tavilyKey||"").trim();
   if(key&&!key.value)key.value=db.settings.tavilyKey||"";
   if(badge){badge.textContent=hasKey?"Activée":"Non configurée";badge.className="webResearchBadge "+(hasKey?"on":"off")}
-  if($("webResearchStatus"))$("webResearchStatus").textContent=hasKey?"Recherche web activée. Le Chef cherchera automatiquement avant les missions.":"Ajoute une clé Tavily pour permettre aux agents de faire de vraies recherches web.";
+  if($("webResearchStatus"))$("webResearchStatus").textContent=hasKey?"Recherche web activée. Le Chef garde automatiquement les informations utiles.":"Ajoute une clé Tavily pour permettre aux agents de faire de vraies recherches web.";
   const arr=p.webResearch||[];
   if(status)status.textContent=arr.length?`${arr.length} source${arr.length>1?"s":""} enregistrée${arr.length>1?"s":""} pour ce projet.`:"Aucune recherche effectuée.";
-  if(!list)return;
-  list.innerHTML=arr.length?[...arr].reverse().slice(0,30).map(r=>`<div class="webSource"><div class="webSourceTop"><a href="${esc(r.url)}" target="_blank" rel="noreferrer">${esc(r.title||r.url)}</a><span class="sourceDomain">${esc(domainOf(r.url))}</span></div><p>${esc(String(r.content||"").slice(0,650))}</p><div class="webSourceQuery">Recherche : ${esc(r.query||"")}</div></div>`).join(""):'<div class="empty">Les sources apparaîtront ici.</div>';
+  if(list)list.innerHTML=arr.length?[...arr].reverse().slice(0,30).map(r=>`<div class="webSource"><div class="webSourceTop"><a href="${esc(r.url)}" target="_blank" rel="noreferrer">${esc(r.title||r.url)}</a><span class="sourceDomain">${esc(domainOf(r.url))}</span></div><p>${esc(String(r.content||"").slice(0,650))}</p><div class="webSourceQuery">Recherche : ${esc(r.query||"")}</div></div>`).join(""):'<div class="empty">Les sources apparaîtront ici.</div>';
+
+  const mem=p.webMemory||[],memList=$("webMemoryList"),memCount=$("webMemoryCount");
+  if(memCount)memCount.textContent=`${mem.length} élément${mem.length>1?"s":""}`;
+  if(memList){
+    memList.innerHTML=mem.length?[...mem].reverse().map(x=>`<div class="webMemoryItem"><div class="webMemoryTop"><span class="webMemoryCategory">${esc(x.category||"Projet")}</span><button data-web-memory-rm="${esc(x.id)}" title="Retirer de la mémoire">×</button></div><div class="webMemoryFact">${esc(x.fact)}</div><a href="${esc(x.url)}" target="_blank" rel="noreferrer">${esc(x.title||domainOf(x.url))}</a></div>`).join(""):'<div class="empty">Aucune information retenue pour le moment.</div>';
+    memList.querySelectorAll("[data-web-memory-rm]").forEach(b=>b.onclick=()=>removeWebMemory(b.dataset.webMemoryRm));
+  }
 }
 async function tavilySearch(query,maxResults=8){
   const key=String(db.settings.tavilyKey||"").trim();
@@ -502,7 +543,7 @@ async function runWebResearch(goal,{silent=false,force=false}={}){
   if(cached.length&&!force){
     if(status)status.textContent=`✓ ${cached.length} source${cached.length>1?"s":""} récente${cached.length>1?"s":""} réutilisée${cached.length>1?"s":""} — 0 nouveau crédit.`;
     if(!silent)addMessage("coordinator","user","J’ai déjà des sources récentes pour cette recherche. Je les réutilise sans consommer de nouveau crédit.","direct");
-    renderWebResearch();renderChats();return cached;
+    rememberWebResults(cached);renderWebResearch();renderChats();return cached;
   }
   if(status)status.textContent="Le Chef fait 1 recherche Internet et la partage avec toute l’équipe…";
   if(!silent)addMessage("coordinator","user","Je fais une seule recherche Internet, puis toute l’équipe réutilisera les mêmes sources.","direct");
@@ -514,7 +555,7 @@ async function runWebResearch(goal,{silent=false,force=false}={}){
   }
   const byUrl=new Map((p.webResearch||[]).map(x=>[x.url,x]));
   for(const r of all){if(r.url)byUrl.set(r.url,r)}
-  p.webResearch=[...byUrl.values()].slice(-80);save();renderWebResearch();
+  p.webResearch=[...byUrl.values()].slice(-80);rememberWebResults(all);save();renderWebResearch();
   if(status)status.textContent=`✓ 1 recherche effectuée · ${all.length} résultat${all.length>1?"s":""}. Toutes les IA utilisent ces mêmes sources.`;
   if(!silent)addMessage("coordinator","user",`J’ai terminé la recherche Internet. J’ai ajouté ${all.length} sources au projet. Finance, Investisseur, Architecture, Opérations et Vérification vont toutes les réutiliser.`,"direct");
   renderChats();return all;
@@ -812,7 +853,7 @@ $("folderInput").onchange=e=>processFolderWithChief(e.target.files);
 $("buildMasterDossier").onclick=buildMasterDossier;
 $("downloadMasterDossier").onclick=downloadMasterDossier;
 $("attachChat").onclick=()=>$("fileInput").click();
-$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],folderBriefs:[],masterDossier:"",webResearch:[],finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
+$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],folderBriefs:[],masterDossier:"",webResearch:[],webMemory:[],finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
 $("sendDirect").onclick=()=>sendDirect("directInput");$("directInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("directInput")}});$("conversationSend").onclick=()=>sendDirect("conversationInput");$("conversationInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("conversationInput")}});
 $("talkFocus").onclick=()=>{$("directPanel").scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>$("directInput").focus(),350)};
 $("historyFocus").onclick=()=>openConversation();$("networkFilter").onchange=renderChats;
