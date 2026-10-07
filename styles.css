@@ -167,3 +167,12 @@
 .finalDocEditor{width:min(860px,100%);min-height:980px;margin:0 auto;background:white;color:#17202a;padding:70px 74px;box-shadow:0 14px 50px #0008;outline:none;font-family:Arial,Helvetica,sans-serif;line-height:1.55;font-size:14px}
 .finalDocEditor h1{font-size:28px;margin:0 0 22px;color:#111827}.finalDocEditor h2{font-size:20px;margin:26px 0 10px;color:#1f2937}.finalDocEditor h3{font-size:16px;margin:20px 0 8px}.finalDocEditor p{margin:0 0 11px}.finalDocEditor ul,.finalDocEditor ol{margin:8px 0 14px 24px}
 @media(max-width:760px){.finalDocTop{display:block}.finalDocActions{justify-content:flex-start;margin-top:8px}.finalDocMeta{display:block}.finalDocTitle{max-width:none;width:100%;margin-bottom:7px}.paperStage{padding:8px}.finalDocEditor{padding:34px 24px;min-height:760px}}
+
+
+/* v2.7 reprise de mission */
+.headerRunActions{display:flex;gap:8px;align-items:center}
+.resumeBtn{border:1px solid #34d399;background:#0d2a23;color:#c8ffec;border-radius:10px;padding:9px 12px;font-weight:800}
+.resumeBtn:hover{background:#12382f}
+.resumeKey{display:inline-grid;place-items:center;margin-left:6px;min-width:19px;height:19px;border-radius:6px;background:#173b32;color:#8ff0cb;font-size:10px}
+.resumeInfo{margin-top:8px;border:1px solid #70551e;background:#241d0c;color:#f4dfa0;border-radius:10px;padding:10px 12px;font-size:11px}
+.resumeInfo button{margin-left:8px;border:1px solid #806627;background:#322812;color:#ffe9a6;border-radius:8px;padding:6px 8px;font-weight:800}
