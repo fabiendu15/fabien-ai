@@ -4,12 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer">
 <title>Fabien AI — Salle des agents</title>
-<link rel="stylesheet" href="./styles.css?v=20261007-0845">
+<link rel="stylesheet" href="./styles.css?v=20261007-0915">
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.5</div></div></div>
+  <div class="brand"><span class="brandmark"></span><div>Fabien AI<div class="tiny">Salle des agents · local · v2.6</div></div></div>
   <div class="sectionLabel">MES PROJETS</div><div id="projects"></div>
   <button id="newProject" class="project">＋ Nouveau projet</button>
   <button id="optimizerBtn" class="siteOptimizer">✨ Optimiseur du site</button>
@@ -136,6 +136,50 @@
   <div id="masterDossierStatus" class="tiny"></div>
   <div id="masterDossierText" class="reportText">Aucun dossier maître créé.</div>
 </section>
+<section class="panel finalDocumentPanel">
+  <div class="panelTitle finalDocTop">
+    <div>
+      <span>📝 Document final</span>
+      <div class="tiny">Le Chef peut le remplir. Tu peux ensuite le modifier directement comme dans Word.</div>
+    </div>
+    <div class="finalDocActions">
+      <button id="generateFinalDoc" class="primary small">✨ Créer avec le Chef</button>
+      <button id="saveFinalDoc" class="ghost small">Enregistrer</button>
+      <button id="downloadWord" class="ghost small">↓ Word</button>
+      <button id="downloadPdf" class="ghost small">↓ PDF</button>
+    </div>
+  </div>
+
+  <div class="finalDocMeta">
+    <input id="finalDocTitle" class="finalDocTitle" value="Dossier final" aria-label="Titre du document">
+    <span id="finalDocStatus" class="tiny">Enregistré localement</span>
+  </div>
+
+  <div class="wordToolbar" role="toolbar" aria-label="Mise en forme">
+    <button data-editor-cmd="formatBlock" data-editor-value="h1">Titre 1</button>
+    <button data-editor-cmd="formatBlock" data-editor-value="h2">Titre 2</button>
+    <span class="toolbarSep"></span>
+    <button data-editor-cmd="bold"><b>B</b></button>
+    <button data-editor-cmd="italic"><i>I</i></button>
+    <button data-editor-cmd="underline"><u>U</u></button>
+    <span class="toolbarSep"></span>
+    <button data-editor-cmd="insertUnorderedList">• Liste</button>
+    <button data-editor-cmd="insertOrderedList">1. Liste</button>
+    <button data-editor-cmd="justifyLeft">←</button>
+    <button data-editor-cmd="justifyCenter">↔</button>
+    <span class="toolbarSep"></span>
+    <button data-editor-cmd="undo">↶</button>
+    <button data-editor-cmd="redo">↷</button>
+  </div>
+
+  <div class="paperStage">
+    <article id="finalDocEditor" class="finalDocEditor" contenteditable="true" spellcheck="true">
+      <h1>Dossier final</h1>
+      <p>Le Chef peut créer ici le document final du projet.</p>
+    </article>
+  </div>
+</section>
+
 <section class="panel report"><div class="panelTitle"><span>Rapport de la dernière mission</span><button id="copyReport" class="ghost small">Copier</button></div><div id="reportText" class="reportText">Aucun rapport pour ce projet.</div></section>
 </main></div>
 <div id="toastStack" class="toastStack"></div>
@@ -180,5 +224,5 @@
     </div>
   </div>
 
-<script type="module" src="./app.js?v=20261007-0845"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>\n<script type="module" src="./app.js?v=20261007-0915"></script>
 </body></html>
