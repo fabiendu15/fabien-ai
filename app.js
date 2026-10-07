@@ -53,6 +53,38 @@ const save=()=>localStorage.setItem(DBKEY,JSON.stringify(db));
 save();
 const project=()=>db.projects.find(p=>p.id===currentProjectId)||db.projects[0];
 function showError(m=""){$("error").textContent=m;$("error").classList.toggle("show",!!m)}
+function recoverInterruptedRuns(){
+  for(const p of db.projects||[]){
+    const run=p?.runs?.[p.runs.length-1];if(!run)continue;
+    const hasGhost=(run.agents||[]).some(a=>a.status==="working"||a.status==="waiting");
+    if(!hasGhost)continue;
+
+    // Après un rechargement, aucune ancienne exécution JS ne peut encore tourner.
+    // Si le run n'est pas activement piloté par cette page, on le ferme proprement.
+    if(run.status==="running"||run.status==="error"||run.status==="interrupted"){
+      let changed=false;
+      for(const a of run.agents||[]){
+        if(a.status==="working"||a.status==="waiting"){
+          a.status="blocked";
+          a.reason="Mission interrompue : le navigateur ou l’ordinateur s’est arrêté avant la fin.";
+          a.output=a.output||"Cette étape n’a pas pu se terminer. Elle peut être relancée.";
+          a.finished_at=a.finished_at||now();
+          changed=true;
+        }
+      }
+      if(changed){
+        run.status="interrupted";
+        run.final_report=run.final_report&&!/Prompt tokens exceeded|context window|prompt tokens/i.test(run.final_report)
+          ?run.final_report
+          :"Mission interrompue avant la fin. Relance-la pour reprendre avec le contexte condensé.";
+        p.activity=p.activity||[];
+        p.activity.push({id:uid(),time:now(),agent:"coordinator",text:"a détecté une mission interrompue et a arrêté les faux états de travail"});
+        p.messages=p.messages||[];
+        p.messages.push({id:uid(),from:"coordinator",to:"user",body:"La mission précédente s’est arrêtée avant la fin. Certains agents étaient encore affichés comme actifs, mais ils ne travaillaient plus. J’ai corrigé leur état. Tu peux relancer la mission quand tu veux.",channel:"direct",time:now()});
+      }
+    }
+  }
+}
 function stateRows(){const p=project(),run=p?.runs?.[p.runs.length-1],m={};Object.keys(AGENTS).forEach(a=>m[a]={agent_id:a,status:"resting",task:"",progress:0,output:"",started_at:"",finished_at:"",reason:""});(run?.agents||[]).forEach(r=>m[r.agent_id]={...m[r.agent_id],...r});return m}
 function addActivity(text,agent="coordinator"){const p=project();p.activity=p.activity||[];p.activity.push({id:uid(),time:now(),agent,text});p.activity=p.activity.slice(-60);save()}
 function addMessage(from,to,body,channel="internal"){const p=project();p.messages=p.messages||[];p.messages.push({id:uid(),from,to,body:strip(body),channel,time:now()});save()}
@@ -99,7 +131,7 @@ async function handleNotificationAction(action,id){
 
 function renderProjects(){const w=$("projects");w.innerHTML="";db.projects.forEach(p=>{const b=document.createElement("button");b.className="project"+(p.id===currentProjectId?" active":"");b.innerHTML=`<strong>${esc(p.name)}</strong><div class="tiny">${esc(p.description||"Projet local")}</div>`;b.onclick=()=>selectProject(p.id);w.appendChild(b)})}
 function selectProject(id){currentProjectId=id;db.selectedProject=id;save();selectedAgent="coordinator";$("projectTitle").textContent=project().name;renderAll()}
-const stateLabel=s=>({working:"Travaille",waiting:"En attente",blocked:"Bloqué",resting:"Se repose",done:"Terminé"})[s]||"Se repose";
+const stateLabel=s=>({working:"Travaille",waiting:"En attente",blocked:"Bloqué",resting:"Se repose",done:"Terminé",interrupted:"Interrompu"})[s]||"Se repose";
 function renderRoom(){
   const rows=stateRows(),groups={working:[],waiting:[],blocked:[],resting:[]};
   Object.keys(AGENTS).forEach(a=>{let st=rows[a].status||"resting";if(st==="done")st="resting";(groups[st]||groups.resting).push(a)});
@@ -389,7 +421,18 @@ async function runMission(){
     const final=await llm(AGENTS.verifier.role,`MISSION:\n${goal}\n\nMÉMOIRE ET FICHIERS:\n${memory()||"Aucune"}\n\nANALYSES:\n${pack}\n\nCRITIQUE:\n${crit}\n\nRédige un rapport clair avec RÉPONSE, CHIFFRES/HYPOTHÈSES, PROBLÈMES À CORRIGER, DÉCISIONS POUR FABIEN, PROCHAINE ACTION.`,850);
     setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
     run.final_report=final;run.status="done";save();addActivity("rapport final terminé","verifier");renderAll();
-  }catch(e){const info=humanError(e);run.status="error";run.final_report=info.message;save();showError("");addNotification("coordinator",info.title,info.message,"error",info.action,String(e?.message||e));addMessage("coordinator","user",`Je n’ai pas pu terminer la mission : ${info.message} Je te propose de réparer automatiquement puis de reprendre.`,"direct");renderAll()}
+  }catch(e){
+    const info=humanError(e);
+    for(const a of run.agents||[]){
+      if(a.status==="working"||a.status==="waiting"){
+        a.status="blocked";a.reason=info.message;a.output=a.output||info.message;a.finished_at=now();
+      }
+    }
+    run.status="error";run.final_report=info.message;save();showError("");
+    addNotification("coordinator",info.title,info.message,"error",info.action,String(e?.message||e));
+    addMessage("coordinator","user",`Je n’ai pas pu terminer la mission : ${info.message} J’ai arrêté proprement les agents concernés pour qu’aucun ne reste affiché en train de travailler. Tu peux ensuite réparer et relancer.`,"direct");
+    renderAll()
+  }
   finally{running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false}
 }
 async function sendDirect(sourceId="directInput"){
@@ -446,4 +489,4 @@ $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("clos
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
 if(!navigator.gpu){$("engineDot").className="statusDot bad";$("engineText").textContent="WebGPU indisponible";$("setupText").textContent="Utilise Chrome récent pour faire tourner l’IA localement."}else $("engineText").textContent="IA locale disponible";
-currentProjectId=(db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject))?db.selectedProject:db.projects[0].id;db.selectedProject=currentProjectId;save();$("projectTitle").textContent=project()?.name||"Mon projet";renderAll();setInterval(renderDetail,1000);
+recoverInterruptedRuns();currentProjectId=(db.selectedProject&&db.projects.some(p=>p.id===db.selectedProject))?db.selectedProject:db.projects[0].id;db.selectedProject=currentProjectId;save();$("projectTitle").textContent=project()?.name||"Mon projet";renderAll();setInterval(renderDetail,1000);
