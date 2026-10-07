@@ -158,8 +158,10 @@ function renderProjectFiles(){
   box.querySelectorAll("[data-rmfile]").forEach(b=>b.onclick=()=>{p.files.splice(Number(b.dataset.rmfile),1);save();renderProjectFiles()});
 }
 function projectContext(){
-  const p=project(),files=(p.files||[]).map(f=>`### Fichier: ${f.name}\n${f.text||""}`).join("\n\n");
-  return [p.memory||"",files].filter(Boolean).join("\n\n").slice(0,180000);
+  const p=project();
+  const files=(p.files||[]).map(f=>`### Fichier: ${f.name}\n${f.text||""}`).join("\n\n");
+  const folder=(p.folderBriefs||[]).map(f=>`### Dossier: ${f.path}\n${f.summary||""}`).join("\n\n");
+  return [p.memory||"",folder,p.masterDossier||"",files].filter(Boolean).join("\n\n").slice(0,180000);
 }
 async function readProjectFile(file){
   const ext=(file.name.split(".").pop()||"").toLowerCase();
@@ -193,8 +195,74 @@ async function handleFiles(files){
   }
   save();renderProjectFiles();addActivity("fichiers du projet mis à jour");
 }
+
+function renderMasterDossier(){
+  const p=project();
+  const out=$("masterDossierText"),status=$("masterDossierStatus");
+  if(out)out.textContent=p.masterDossier||"Aucun dossier maître créé.";
+  if(status&&p.masterDossier&&!status.textContent)status.textContent="✓ Dossier maître disponible.";
+}
+async function summarizeForChief(name,text){
+  const excerpt=String(text||"").trim().slice(0,22000);
+  if(!excerpt)return "Fichier non lisible automatiquement.";
+  return await llm(
+    AGENTS.coordinator.role+" Tu prépares un dossier maître. Résume fidèlement ce document, sans rien inventer.",
+    `DOCUMENT: ${name}\n\nCONTENU:\n${excerpt}\n\nDonne: faits importants, chiffres, décisions/contraintes, questions ou incohérences, éléments à conserver. Maximum 350 mots.`,
+    520
+  );
+}
+async function processFolderWithChief(files){
+  const list=[...files].filter(f=>!f.name.startsWith(".")).slice(0,40);
+  if(!list.length)return;
+  const p=project();p.folderBriefs=[];
+  $("folderStatus").textContent=`Chef : préparation de ${list.length} fichier(s)…`;
+  if(!await ensureModel()){ $("folderStatus").textContent="Impossible de charger l’IA locale."; return; }
+  for(let i=0;i<list.length;i++){
+    const file=list[i],path=file.webkitRelativePath||file.name;
+    $("folderStatus").textContent=`Chef : analyse ${i+1}/${list.length} — ${path}`;
+    try{
+      const text=await readProjectFile(file);
+      const summary=await summarizeForChief(path,text);
+      p.folderBriefs.push({path,name:file.name,summary,time:now()});
+    }catch(e){
+      p.folderBriefs.push({path,name:file.name,summary:"Erreur de lecture : "+(e?.message||e),time:now()});
+    }
+    save();
+  }
+  $("folderStatus").textContent=`✓ ${p.folderBriefs.length} fichier(s) analysé(s). Construction du dossier maître…`;
+  await buildMasterDossier();
+  $("folderStatus").textContent="✓ Dossier analysé et dossier maître créé par le Chef.";
+  addActivity("a analysé un dossier complet","coordinator");
+  renderAll();
+}
+async function buildMasterDossier(){
+  const p=project();
+  const summaries=(p.folderBriefs||[]).map(x=>`### ${x.path}\n${x.summary}`).join("\n\n");
+  const manual=(p.files||[]).map(x=>`### ${x.name}\n${String(x.text||"").slice(0,10000)}`).join("\n\n");
+  const source=[
+    p.memory?`## Mémoire du projet\n${p.memory}`:"",
+    summaries?`## Résumés du dossier\n${summaries}`:"",
+    manual?`## Fichiers ajoutés\n${manual}`:""
+  ].filter(Boolean).join("\n\n");
+  if(!source.trim()){ $("masterDossierStatus").textContent="Ajoute d’abord un dossier, des fichiers ou des informations au projet.";return; }
+  $("masterDossierStatus").textContent="Le Chef construit le dossier maître…";
+  if(!await ensureModel()){ $("masterDossierStatus").textContent="IA locale non disponible.";return; }
+  const out=await llm(
+    AGENTS.coordinator.role+" Tu dois produire un dossier professionnel, extrêmement clair, structuré et exploitable. Distingue les faits des hypothèses et n’invente rien.",
+    `SOURCE DU PROJET:\n${source.slice(0,90000)}\n\nCrée le DOSSIER MAÎTRE avec exactement cette structure:\n1. RÉSUMÉ EXÉCUTIF\n2. OBJECTIF DU PROJET\n3. FAITS ET DONNÉES CONFIRMÉES\n4. CHIFFRES CLÉS\n5. DÉCISIONS DÉJÀ PRISES\n6. CONTRAINTES\n7. ORGANISATION / STRUCTURE\n8. POINTS À VÉRIFIER\n9. CONTRADICTIONS OU RISQUES\n10. INFORMATIONS MANQUANTES\n11. PROCHAINES DÉCISIONS À PRENDRE\n12. PLAN D’ACTION PRIORISÉ\n13. SOURCES / DOCUMENTS UTILISÉS\n\nSois carré, concis et professionnel. Indique clairement « non fourni » quand une information manque.`,
+    1500
+  );
+  p.masterDossier=out;save();$("masterDossierStatus").textContent="✓ Dossier maître à jour.";renderMasterDossier();
+}
+function downloadMasterDossier(){
+  const p=project();if(!p.masterDossier)return;
+  const blob=new Blob([p.masterDossier],{type:"text/markdown;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=(p.name||"projet").replace(/[^a-z0-9_-]+/gi,"-")+"-dossier-maitre.md";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+}
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
-function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderReport()}
+function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderReport()}
 
 async function ensureModel(){if(engineReady&&engine)return true;if(engineLoading)return false;if(!navigator.gpu){showError("WebGPU n’est pas disponible. Utilise Chrome récent sur ce Mac.");return false}engineLoading=true;showError("");$("loadModelBtn").disabled=true;$("engineText").textContent="Chargement de l’IA locale…";const model=$("modelSelect").value;db.settings.model=model;save();try{const appConfig={...webllm.prebuiltAppConfig,cacheBackend:"indexeddb"};engine=await webllm.CreateMLCEngine(model,{appConfig,initProgressCallback:p=>{const pc=Math.round((p.progress||0)*100);$("loadBarFill").style.width=pc+"%";$("loadPct").textContent=pc+" %";$("setupText").textContent=p.text||"Téléchargement du modèle…"}});engineReady=true;$("engineDot").className="statusDot ok";$("engineText").textContent="IA locale prête";$("loadModelBtn").textContent="IA locale prête ✓";$("setupText").textContent="Le modèle est prêt. Les analyses se font dans ce navigateur.";return true}catch(e){$("engineDot").className="statusDot bad";$("engineText").textContent="Erreur IA locale";showError("Impossible de charger le modèle : "+(e?.message||e));return false}finally{engineLoading=false;$("loadModelBtn").disabled=false}}
 async function llm(system,user,max_tokens=500){if(!await ensureModel())throw new Error("IA locale non prête");const r=await engine.chat.completions.create({messages:[{role:"system",content:system+"\nRéponds en français. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes."},{role:"user",content:user}],temperature:.25,max_tokens});return strip(r.choices?.[0]?.message?.content||"")}
@@ -244,8 +312,13 @@ $("parallel").value=String(db.settings.parallel||2);
 $("parallel").onchange=()=>{db.settings.parallel=Number($("parallel").value);save()};
 $("runBtn").onclick=runMission;$("newTaskBtn").onclick=()=>{$("goal").focus();$("goal").scrollIntoView({behavior:"smooth",block:"center"})};
 $("memoryBtn").onclick=()=>{$("memoryDrawer").classList.toggle("open");renderProjectFiles()};
-$("saveMemory").onclick=()=>{const t=$("memoryText").value.trim();if(!t)return;project().memory+=(project().memory?"\n\n":"")+t;save();$("memoryText").value="";addActivity("mémoire du projet mise à jour");renderAll()};$("fileInput").onchange=e=>handleFiles(e.target.files);$("attachChat").onclick=()=>$("fileInput").click();
-$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
+$("saveMemory").onclick=()=>{const t=$("memoryText").value.trim();if(!t)return;project().memory+=(project().memory?"\n\n":"")+t;save();$("memoryText").value="";addActivity("mémoire du projet mise à jour");renderAll()};
+$("fileInput").onchange=e=>handleFiles(e.target.files);
+$("folderInput").onchange=e=>processFolderWithChief(e.target.files);
+$("buildMasterDossier").onclick=buildMasterDossier;
+$("downloadMasterDossier").onclick=downloadMasterDossier;
+$("attachChat").onclick=()=>$("fileInput").click();
+$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
 $("sendDirect").onclick=()=>sendDirect("directInput");$("directInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("directInput")}});$("conversationSend").onclick=()=>sendDirect("conversationInput");$("conversationInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("conversationInput")}});
 $("talkFocus").onclick=()=>{$("directPanel").scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>$("directInput").focus(),350)};
 $("historyFocus").onclick=()=>openConversation();$("networkFilter").onchange=renderChats;
