@@ -464,46 +464,59 @@ function renderWebResearch(){
   if(!list)return;
   list.innerHTML=arr.length?[...arr].reverse().slice(0,30).map(r=>`<div class="webSource"><div class="webSourceTop"><a href="${esc(r.url)}" target="_blank" rel="noreferrer">${esc(r.title||r.url)}</a><span class="sourceDomain">${esc(domainOf(r.url))}</span></div><p>${esc(String(r.content||"").slice(0,650))}</p><div class="webSourceQuery">Recherche : ${esc(r.query||"")}</div></div>`).join(""):'<div class="empty">Les sources apparaîtront ici.</div>';
 }
-async function tavilySearch(query,maxResults=5){
+async function tavilySearch(query,maxResults=8){
   const key=String(db.settings.tavilyKey||"").trim();
   if(!key)throw new Error("Recherche Internet non configurée");
   const r=await fetch("https://api.tavily.com/search",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({api_key:key,query,search_depth:"advanced",max_results:maxResults,include_answer:false,include_raw_content:false})
+    body:JSON.stringify({
+      api_key:key,
+      query,
+      search_depth:"basic",
+      max_results:maxResults,
+      include_answer:false,
+      include_raw_content:false
+    })
   });
   if(!r.ok)throw new Error("Recherche web indisponible ("+r.status+")");
   const data=await r.json();
   return (data.results||[]).map(x=>({title:x.title||x.url,url:x.url,content:x.content||"",score:x.score||0,query,time:now()}));
 }
-function researchQueries(goal){
-  const g=String(goal||"").trim();
-  const base=g||"centre de récupération guidée clinique intégrée Montréal";
-  return [
-    base+" Montréal Québec données marché coûts concurrence",
-    base+" salaires loyers commerciaux prix Montréal Québec",
-    base+" réglementation Québec Canada sources officielles"
-  ];
+function researchQuery(goal){
+  const g=String(goal||"").trim()||"centre de récupération guidée clinique intégrée";
+  return g+" Montréal Québec marché concurrence loyers commerciaux salaires coûts réglementation sources officielles";
 }
-async function runWebResearch(goal,{silent=false}={}){
+function recentCachedResearch(p,query,maxAgeDays=7){
+  const maxAge=maxAgeDays*24*60*60*1000,cut=Date.now()-maxAge;
+  return (p.webResearch||[]).filter(r=>r.query===query&&new Date(r.time||0).getTime()>=cut);
+}
+async function runWebResearch(goal,{silent=false,force=false}={}){
   const key=String(db.settings.tavilyKey||"").trim();
   if(!key){
     if(!silent)addNotification("coordinator","Recherche Internet non configurée","Ajoute une clé Tavily gratuite dans la section Recherche Internet pour que je puisse vérifier le marché et les données réelles.","warning","open-agent");
     return [];
   }
-  const p=project(),status=$("researchMissionStatus");
-  if(status)status.textContent="Le Chef recherche des données réelles sur Internet…";
-  if(!silent)addMessage("coordinator","user","Je commence par vérifier les données réelles sur Internet avant de faire travailler l’équipe.","direct");
-  const queries=researchQueries(goal),all=[];
-  for(let i=0;i<queries.length;i++){
-    if(status)status.textContent=`Recherche Internet ${i+1}/${queries.length}…`;
-    try{all.push(...await tavilySearch(queries[i],4))}catch(e){if(!silent)addNotification("coordinator","Recherche web incomplète",String(e?.message||e),"warning","open-agent")}
+  const p=project(),status=$("researchMissionStatus"),query=researchQuery(goal);
+  const cached=recentCachedResearch(p,query,7);
+  if(cached.length&&!force){
+    if(status)status.textContent=`✓ ${cached.length} source${cached.length>1?"s":""} récente${cached.length>1?"s":""} réutilisée${cached.length>1?"s":""} — 0 nouveau crédit.`;
+    if(!silent)addMessage("coordinator","user","J’ai déjà des sources récentes pour cette recherche. Je les réutilise sans consommer de nouveau crédit.","direct");
+    renderWebResearch();renderChats();return cached;
+  }
+  if(status)status.textContent="Le Chef fait 1 recherche Internet et la partage avec toute l’équipe…";
+  if(!silent)addMessage("coordinator","user","Je fais une seule recherche Internet, puis toute l’équipe réutilisera les mêmes sources.","direct");
+  let all=[];
+  try{all=await tavilySearch(query,8)}
+  catch(e){
+    if(!silent)addNotification("coordinator","Recherche web incomplète",String(e?.message||e),"warning","open-agent");
+    return [];
   }
   const byUrl=new Map((p.webResearch||[]).map(x=>[x.url,x]));
   for(const r of all){if(r.url)byUrl.set(r.url,r)}
-  p.webResearch=[...byUrl.values()].slice(-60);save();renderWebResearch();
-  if(status)status.textContent=`✓ ${all.length} résultat${all.length>1?"s":""} trouvé${all.length>1?"s":""}. Les sources sont maintenant disponibles aux agents.`;
-  if(!silent)addMessage("coordinator","user",`J’ai terminé la recherche Internet. J’ai ajouté ${all.length} résultats au projet et je vais utiliser ces sources dans l’analyse.`,"direct");
+  p.webResearch=[...byUrl.values()].slice(-80);save();renderWebResearch();
+  if(status)status.textContent=`✓ 1 recherche effectuée · ${all.length} résultat${all.length>1?"s":""}. Toutes les IA utilisent ces mêmes sources.`;
+  if(!silent)addMessage("coordinator","user",`J’ai terminé la recherche Internet. J’ai ajouté ${all.length} sources au projet. Finance, Investisseur, Architecture, Opérations et Vérification vont toutes les réutiliser.`,"direct");
   renderChats();return all;
 }
 async function testWebResearch(){
@@ -821,7 +834,7 @@ $("runOptimizer").onclick=runOptimizer;$("optimizerInput").addEventListener("key
 
 $("saveTavilyKey").onclick=()=>{db.settings.tavilyKey=$("tavilyKey").value.trim();save();renderWebResearch();$("webResearchStatus").textContent=db.settings.tavilyKey?"✓ Clé enregistrée dans ce navigateur.":"Clé supprimée."};
 $("testWebResearch").onclick=testWebResearch;
-$("researchNow").onclick=()=>runWebResearch($("goal").value.trim()||project().name);
+$("researchNow").onclick=()=>runWebResearch($("goal").value.trim()||project().name,{force:true});
 $("notificationBtn").onclick=()=>{$("notificationCenter").classList.toggle("hidden");db.notifications.forEach(n=>n.read=true);save();renderNotifications()};
 $("closeNotificationCenter").onclick=()=>$("notificationCenter").classList.add("hidden");
 $("clearNotifications").onclick=()=>{db.notifications.forEach(n=>n.read=true);save();renderNotifications()};
