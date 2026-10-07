@@ -48,6 +48,7 @@ function loadDB(){
 }
 let db=loadDB();
 db.optimizer=db.optimizer||[];
+db.notifications=Array.isArray(db.notifications)?db.notifications:[];
 const save=()=>localStorage.setItem(DBKEY,JSON.stringify(db));
 save();
 const project=()=>db.projects.find(p=>p.id===currentProjectId)||db.projects[0];
@@ -55,6 +56,46 @@ function showError(m=""){$("error").textContent=m;$("error").classList.toggle("s
 function stateRows(){const p=project(),run=p?.runs?.[p.runs.length-1],m={};Object.keys(AGENTS).forEach(a=>m[a]={agent_id:a,status:"resting",task:"",progress:0,output:"",started_at:"",finished_at:"",reason:""});(run?.agents||[]).forEach(r=>m[r.agent_id]={...m[r.agent_id],...r});return m}
 function addActivity(text,agent="coordinator"){const p=project();p.activity=p.activity||[];p.activity.push({id:uid(),time:now(),agent,text});p.activity=p.activity.slice(-60);save()}
 function addMessage(from,to,body,channel="internal"){const p=project();p.messages=p.messages||[];p.messages.push({id:uid(),from,to,body:strip(body),channel,time:now()});save()}
+
+function humanError(err){
+  const raw=String(err?.message||err||"");
+  if(/context window|prompt tokens|4096|exceed context/i.test(raw))return {kind:"context",title:"Trop d’informations à traiter d’un coup",message:"Le contexte est trop volumineux pour le modèle local. Je vais réduire automatiquement les informations envoyées et réessayer.",action:"compact-retry"};
+  if(/webgpu|gpu/i.test(raw))return {kind:"engine",title:"Le moteur local n’est pas disponible",message:"Je n’arrive pas à utiliser l’accélération du navigateur. Vérifie que Chrome est à jour puis recharge l’IA locale.",action:"reload-model"};
+  if(/memory|out of memory|allocation/i.test(raw))return {kind:"memory",title:"Mémoire insuffisante",message:"Le modèle utilise trop de mémoire. Je peux alléger le contexte ou utiliser un modèle plus petit.",action:"compact-retry"};
+  if(/pdf|docx|xlsx|file|fichier|lecture/i.test(raw))return {kind:"file",title:"Je n’arrive pas à lire un document",message:"Un fichier pose problème. Je garde les autres documents et je peux continuer sans celui-ci.",action:"open-agent"};
+  return {kind:"generic",title:"Un agent a rencontré un problème",message:"Je n’ai pas pu terminer cette étape. Je te montre ce qui s’est passé et je peux réessayer.",action:"retry-last"};
+}
+function showToast(n){
+  const stack=$("toastStack");if(!stack)return;
+  const m=AGENTS[n.agent]||AGENTS.coordinator,el=document.createElement("div");
+  el.className="agentToast "+(n.severity||"warning");el.dataset.toast=n.id;
+  el.innerHTML=`<div class="agentToastHead"><div class="agentToastWho"><span class="agentToastOrb" style="--c:${m.color}"></span><div><h4>${esc(m.name)} veut te parler</h4><div class="tiny">${esc(n.title)}</div></div></div><button class="modalClose" data-dismiss-toast="${n.id}">×</button></div><p>${esc(n.message)}</p><div class="agentToastActions"><button class="primaryFix" data-note-action="${esc(n.action||"open-agent")}" data-note-id="${n.id}">${n.action==="compact-retry"?"Réparer automatiquement":n.action==="reload-model"?"Recharger l’IA":"Voir / réessayer"}</button><button data-note-action="open-agent" data-note-id="${n.id}">Parler à ${esc(m.name)}</button></div>`;
+  stack.appendChild(el);
+  el.querySelectorAll("[data-dismiss-toast]").forEach(b=>b.onclick=()=>el.remove());
+  el.querySelectorAll("[data-note-action]").forEach(b=>b.onclick=()=>handleNotificationAction(b.dataset.noteAction,b.dataset.noteId));
+  setTimeout(()=>{if(el.isConnected)el.remove()},15000);
+}
+function addNotification(agent,title,message,severity="warning",action="open-agent",detail=""){
+  const n={id:uid(),agent:agent||"coordinator",title,message,severity,action,detail,time:now(),read:false};
+  db.notifications.push(n);db.notifications=db.notifications.slice(-80);save();renderNotifications();showToast(n);return n;
+}
+function renderNotifications(){
+  const list=$("notificationList"),count=$("notificationCount");if(!list||!count)return;
+  const unread=db.notifications.filter(n=>!n.read).length;count.textContent=unread;count.classList.toggle("hidden",!unread);
+  list.innerHTML=db.notifications.length?[...db.notifications].reverse().map(n=>{const m=AGENTS[n.agent]||AGENTS.coordinator;return `<div class="notificationItem ${n.read?"":"unread"}"><div class="notificationItemTop"><b>${esc(m.name)} · ${esc(n.title)}</b><time>${fmt(n.time)}</time></div><p>${esc(n.message)}</p><div class="notificationItemActions"><button data-note-action="${esc(n.action||"open-agent")}" data-note-id="${n.id}">${n.action==="compact-retry"?"Réparer automatiquement":n.action==="reload-model"?"Recharger l’IA":"Ouvrir"}</button><button data-note-action="open-agent" data-note-id="${n.id}">Parler à l’agent</button></div></div>`}).join(""):'<div class="empty">Aucune notification.</div>';
+  list.querySelectorAll("[data-note-action]").forEach(b=>b.onclick=()=>handleNotificationAction(b.dataset.noteAction,b.dataset.noteId));
+}
+async function handleNotificationAction(action,id){
+  const n=db.notifications.find(x=>x.id===id);if(n)n.read=true;save();renderNotifications();
+  if(action==="open-agent"){selectedAgent=n?.agent||"coordinator";renderAll();$("notificationCenter").classList.add("hidden");$("directPanel").scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>$("directInput").focus(),350);return}
+  if(action==="reload-model"){engine=null;engineReady=false;$("notificationCenter").classList.add("hidden");await ensureModel();return}
+  if(action==="compact-retry"||action==="retry-last"){
+    db.settings.compactContext=true;save();$("notificationCenter").classList.add("hidden");
+    const last=project()?.runs?.slice(-1)[0]?.goal||$("goal").value.trim();
+    if(last){$("goal").value=last;await runMission();}
+  }
+}
+
 
 function renderProjects(){const w=$("projects");w.innerHTML="";db.projects.forEach(p=>{const b=document.createElement("button");b.className="project"+(p.id===currentProjectId?" active":"");b.innerHTML=`<strong>${esc(p.name)}</strong><div class="tiny">${esc(p.description||"Projet local")}</div>`;b.onclick=()=>selectProject(p.id);w.appendChild(b)})}
 function selectProject(id){currentProjectId=id;db.selectedProject=id;save();selectedAgent="coordinator";$("projectTitle").textContent=project().name;renderAll()}
@@ -287,17 +328,40 @@ function downloadMasterDossier(){
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
 }
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
-function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderReport()}
+function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderReport();renderNotifications()}
 
 async function ensureModel(){if(engineReady&&engine)return true;if(engineLoading)return false;if(!navigator.gpu){showError("WebGPU n’est pas disponible. Utilise Chrome récent sur ce Mac.");return false}engineLoading=true;showError("");$("loadModelBtn").disabled=true;$("engineText").textContent="Chargement de l’IA locale…";const model=$("modelSelect").value;db.settings.model=model;save();try{const appConfig={...webllm.prebuiltAppConfig,cacheBackend:"indexeddb"};engine=await webllm.CreateMLCEngine(model,{appConfig,initProgressCallback:p=>{const pc=Math.round((p.progress||0)*100);$("loadBarFill").style.width=pc+"%";$("loadPct").textContent=pc+" %";$("setupText").textContent=p.text||"Téléchargement du modèle…"}});engineReady=true;$("engineDot").className="statusDot ok";$("engineText").textContent="IA locale prête";$("loadModelBtn").textContent="IA locale prête ✓";$("setupText").textContent="Le modèle est prêt. Les analyses se font dans ce navigateur.";return true}catch(e){$("engineDot").className="statusDot bad";$("engineText").textContent="Erreur IA locale";showError("Impossible de charger le modèle : "+(e?.message||e));return false}finally{engineLoading=false;$("loadModelBtn").disabled=false}}
-async function llm(system,user,max_tokens=500){if(!await ensureModel())throw new Error("IA locale non prête");const r=await engine.chat.completions.create({messages:[{role:"system",content:system+"\nRéponds en français. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes."},{role:"user",content:user}],temperature:.25,max_tokens});return strip(r.choices?.[0]?.message?.content||"")}
+function compactPrompt(text,max=8500){
+  const t=String(text||"");if(t.length<=max)return t;
+  const head=Math.floor(max*.58),tail=max-head;
+  return t.slice(0,head)+"\n\n[... contenu intermédiaire condensé automatiquement ...]\n\n"+t.slice(-tail);
+}
+async function llm(system,user,max_tokens=500){
+  if(!await ensureModel())throw new Error("IA locale non prête");
+  const sys=system+"\nRéponds toujours en français naturel. N'affiche jamais ton raisonnement interne. N'invente pas les données manquantes.";
+  let prompt=db.settings.compactContext?compactPrompt(user,7000):String(user||"");
+  try{
+    const r=await engine.chat.completions.create({messages:[{role:"system",content:sys},{role:"user",content:prompt}],temperature:.25,max_tokens});
+    return strip(r.choices?.[0]?.message?.content||"");
+  }catch(e){
+    const info=humanError(e);
+    if(info.kind==="context"){
+      addNotification("coordinator","Je réduis le contexte",info.message,"warning","open-agent",String(e?.message||e));
+      prompt=compactPrompt(user,6200);
+      const r=await engine.chat.completions.create({messages:[{role:"system",content:sys},{role:"user",content:prompt}],temperature:.2,max_tokens:Math.min(max_tokens,650)});
+      addNotification("coordinator","Problème réparé","J’ai réduit le contexte et j’ai pu reprendre le travail.","success","open-agent");
+      return strip(r.choices?.[0]?.message?.content||"");
+    }
+    throw e;
+  }
+}
 const memory=()=>projectContext();
 function choose(goal){const g=goal.toLowerCase(),o=[],add=a=>{if(!o.includes(a))o.push(a)};if(/reven|coût|cout|budget|marge|prix|rentab|tax|salaire/.test(g))add("finance");if(/plan|surface|pi²|m2|m²|salle|vestiaire|circulation|architect/.test(g))add("spaces");if(/horaire|rotation|capacité|capacite|personnel|nettoyage|opération/.test(g))add("operations");if(/clinique|thérap|client|rendez-vous|soin/.test(g))add("clinic");if(/toladi|huile|packaging|marque|bouteille/.test(g))add("toladi");if(/marketing|instagram|pub|vente|communication/.test(g))add("marketing");if(/invest|business|présentation|financement/.test(g))add("investor");if(/donnée|data|tableau|csv|statistique|calcul/.test(g))add("data");if(/produit|fonctionnalité|experience|expérience/.test(g))add("product");if(/texte|rédaction|contenu|document|présentation/.test(g))add("content");if(/bug|erreur|bloqu|support|technique/.test(g))add("support");if(o.length<2){add("finance");add("operations")}return o.slice(0,6)}
 async function plan(goal){try{const out=await llm(AGENTS.coordinator.role,`MÉMOIRE:\n${memory()||"Aucune"}\n\nMISSION:\n${goal}\n\nChoisis 2 à 6 spécialistes parmi finance, spaces, operations, clinic, toladi, marketing, investor, data, product, content, support. Réponds: AGENTS: id,id puis PLAN: une phrase.`,180),m=out.match(/AGENTS\s*:\s*([^\n]+)/i),arr=m?m[1].split(/[,; ]+/).filter(x=>SPECIALISTS.includes(x)):[];return {agents:arr.length?[...new Set(arr)].slice(0,5):choose(goal),plan:out}}catch{return {agents:choose(goal),plan:"Plan local de secours."}}}
 function makeRun(goal){const run={id:uid(),goal,created_at:now(),status:"running",agents:Object.keys(AGENTS).map(a=>({agent_id:a,status:"resting",task:"",progress:0,output:"",started_at:"",finished_at:"",reason:""})),final_report:""};project().runs.push(run);project().runs=project().runs.slice(-15);save();return run}
 const row=(run,a)=>run.agents.find(x=>x.agent_id===a);
 function setA(run,a,p){Object.assign(row(run,a),p);save();renderAll()}
-async function doAgent(run,aid,goal){setA(run,aid,{status:"working",task:`Analyse : ${goal.slice(0,70)}`,progress:20,started_at:now(),reason:""});addActivity("commence son analyse",aid);addMessage("coordinator",aid,`Analyse cette mission : ${goal}`,"internal");try{const inbox=(project().messages||[]).filter(m=>m.channel==="internal"&&m.to===aid).slice(-8).map(m=>`${AGENTS[m.from]?.name||m.from}: ${m.body}`).join("\n");const out=await llm(AGENTS[aid].role+`\nSignale les blocages, distingue fait/hypothèse et ne prétends jamais qu\'une règle légale est satisfaite sans preuve.`,`MÉMOIRE DU PROJET:\n${memory()||"Aucune donnée"}\n\nMESSAGES REÇUS DU RÉSEAU IA:\n${inbox||"Aucun"}\n\nMISSION:\n${goal}\n\nFais uniquement ton analyse.`,650);const blocked=/donnée.{0,15}manquant|impossible|bloqu/i.test(out)&&memory().trim().length<40;setA(run,aid,{status:blocked?"blocked":"done",progress:100,output:out,finished_at:now(),reason:blocked?"Informations insuffisantes pour conclure.":""});addMessage(aid,"coordinator",out,"internal");addActivity(blocked?"signale un blocage":"termine son analyse",aid);return out}catch(e){const msg=e?.message||String(e);setA(run,aid,{status:"blocked",progress:100,output:msg,reason:msg,finished_at:now()});return "BLOCAGE "+AGENTS[aid].name+": "+msg}}
+async function doAgent(run,aid,goal){setA(run,aid,{status:"working",task:`Analyse : ${goal.slice(0,70)}`,progress:20,started_at:now(),reason:""});addActivity("commence son analyse",aid);addMessage("coordinator",aid,`Analyse cette mission : ${goal}`,"internal");try{const inbox=(project().messages||[]).filter(m=>m.channel==="internal"&&m.to===aid).slice(-8).map(m=>`${AGENTS[m.from]?.name||m.from}: ${m.body}`).join("\n");const out=await llm(AGENTS[aid].role+`\nSignale les blocages, distingue fait/hypothèse et ne prétends jamais qu\'une règle légale est satisfaite sans preuve.`,`MÉMOIRE DU PROJET:\n${memory()||"Aucune donnée"}\n\nMESSAGES REÇUS DU RÉSEAU IA:\n${inbox||"Aucun"}\n\nMISSION:\n${goal}\n\nFais uniquement ton analyse.`,650);const blocked=/donnée.{0,15}manquant|impossible|bloqu/i.test(out)&&memory().trim().length<40;setA(run,aid,{status:blocked?"blocked":"done",progress:100,output:out,finished_at:now(),reason:blocked?"Informations insuffisantes pour conclure.":""});addMessage(aid,"coordinator",out,"internal");addActivity(blocked?"signale un blocage":"termine son analyse",aid);return out}catch(e){const msg=e?.message||String(e),info=humanError(e);setA(run,aid,{status:"blocked",progress:100,output:info.message,reason:info.message,finished_at:now()});addNotification(aid,info.title,info.message,"error",info.action,msg);addMessage(aid,"user",`J’ai rencontré un problème : ${info.message} Je vais essayer de le corriger, et je te préviens si j’ai besoin de toi.`,"direct");renderChats();return "BLOCAGE "+AGENTS[aid].name+": "+info.message}}
 async function runMission(){
   if(running)return;
   const goal=$("goal").value.trim();if(!goal)return showError("Écris la mission de l’équipe.");
@@ -325,7 +389,7 @@ async function runMission(){
     const final=await llm(AGENTS.verifier.role,`MISSION:\n${goal}\n\nMÉMOIRE ET FICHIERS:\n${memory()||"Aucune"}\n\nANALYSES:\n${pack}\n\nCRITIQUE:\n${crit}\n\nRédige un rapport clair avec RÉPONSE, CHIFFRES/HYPOTHÈSES, PROBLÈMES À CORRIGER, DÉCISIONS POUR FABIEN, PROCHAINE ACTION.`,850);
     setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
     run.final_report=final;run.status="done";save();addActivity("rapport final terminé","verifier");renderAll();
-  }catch(e){run.status="error";run.final_report="Erreur locale : "+(e?.message||e);save();showError(run.final_report);renderAll()}
+  }catch(e){const info=humanError(e);run.status="error";run.final_report=info.message;save();showError("");addNotification("coordinator",info.title,info.message,"error",info.action,String(e?.message||e));addMessage("coordinator","user",`Je n’ai pas pu terminer la mission : ${info.message} Je te propose de réparer automatiquement puis de reprendre.`,"direct");renderAll()}
   finally{running=false;$("runBtn").disabled=false;$("runBtn").textContent="▶ Lancer";$("newTaskBtn").disabled=false}
 }
 async function sendDirect(sourceId="directInput"){
@@ -344,7 +408,8 @@ async function sendDirect(sourceId="directInput"){
     addMessage(selectedAgent,"user",reply,"direct");renderChats();renderConversationModal();
   }catch(e){
     const raw=String(e?.message||e);
-    const friendly=/context window|prompt tokens|4096/i.test(raw)?"J’ai trop d’informations chargées en même temps. Je vais utiliser les résumés du dossier plutôt que tout le texte brut. Réessaie ta question.":"J’ai eu un problème local pendant ma réponse. Réessaie dans un instant.";
+    const info=humanError(e);const friendly=info.kind==="context"?"J’ai trop d’informations chargées en même temps. Je vais réduire le contexte automatiquement pour pouvoir continuer.":info.message;
+    addNotification(selectedAgent,info.title,friendly,"warning",info.action,raw);
     addMessage(selectedAgent,"user",friendly,"direct");renderChats();renderConversationModal();
   }finally{$("directOnline").textContent="● disponible"}
 }
@@ -374,6 +439,9 @@ $("optimizerBtn").onclick=()=>{$("optimizerModal").classList.remove("hidden");re
 $("closeOptimizer").onclick=()=>$("optimizerModal").classList.add("hidden");$("optimizerModal").onclick=e=>{if(e.target===$("optimizerModal"))$("optimizerModal").classList.add("hidden")};
 document.querySelectorAll(".optQuick").forEach(b=>b.onclick=()=>{$("optimizerInput").value=b.dataset.opt;runOptimizer()});
 $("runOptimizer").onclick=runOptimizer;$("optimizerInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();runOptimizer()}});$("clearOptimizerChat").onclick=()=>{if(confirm("Effacer la conversation avec l’Optimiseur ?")){db.optimizer=[];save();renderOptimizerChat()}};
+$("notificationBtn").onclick=()=>{$("notificationCenter").classList.toggle("hidden");db.notifications.forEach(n=>n.read=true);save();renderNotifications()};
+$("closeNotificationCenter").onclick=()=>$("notificationCenter").classList.add("hidden");
+$("clearNotifications").onclick=()=>{db.notifications.forEach(n=>n.read=true);save();renderNotifications()};
 $("privacyBtn").onclick=()=>$("privacyModal").classList.remove("hidden");$("closePrivacy").onclick=()=>$("privacyModal").classList.add("hidden");$("privacyModal").onclick=e=>{if(e.target===$("privacyModal"))$("privacyModal").classList.add("hidden")};
 $("clearLocal").onclick=()=>{if(confirm("Effacer tous les projets, conversations et rapports locaux ?")){localStorage.removeItem(DBKEY);location.reload()}};
 
