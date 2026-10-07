@@ -31,14 +31,14 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const strip=s=>String(s??"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<\/think>/gi,"").replace(/^\s*(Let me|We need|I need|I will)[^\n]*\n+/i,"").trim();
 const fmt=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("fr-CA",{hour:"2-digit",minute:"2-digit"})};
 
-function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-3B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
+function baseDB(){return {settings:{parallel:2,model:"Qwen2.5-3B-Instruct-q4f16_1-MLC"},projects:[{id:"mon-projet",name:"Mon projet",description:"Projet local",memory:"",files:[],folderBriefs:[],masterDossier:"",finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]}],selectedProject:"mon-projet"}}
 function loadDB(){
   try{
     const base=baseDB(),saved=JSON.parse(localStorage.getItem(DBKEY)||"{}"),merged={...base,...saved};
     if(!Array.isArray(merged.projects)||merged.projects.length===0)merged.projects=base.projects;
     merged.projects=merged.projects.map(p=>({
       id:p.id||uid(),name:p.name||"Mon projet",description:p.description||"Projet local",
-      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],folderBriefs:Array.isArray(p.folderBriefs)?p.folderBriefs:[],masterDossier:p.masterDossier||"",created_at:p.created_at||now(),
+      memory:p.memory||"",files:Array.isArray(p.files)?p.files:[],folderBriefs:Array.isArray(p.folderBriefs)?p.folderBriefs:[],masterDossier:p.masterDossier||"",finalDocTitle:p.finalDocTitle||"Dossier final",finalDocHtml:p.finalDocHtml||"",created_at:p.created_at||now(),
       runs:Array.isArray(p.runs)?p.runs:[],messages:Array.isArray(p.messages)?p.messages:[],activity:Array.isArray(p.activity)?p.activity:[]
     }));
     if(!merged.projects.some(p=>p.id===merged.selectedProject))merged.selectedProject=merged.projects[0].id;
@@ -359,8 +359,65 @@ function downloadMasterDossier(){
   a.href=url;a.download=(p.name||"projet").replace(/[^a-z0-9_-]+/gi,"-")+"-dossier-maitre.md";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
 }
+
+function escHtmlText(t){return String(t||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function plainTextToHtml(text){
+  const lines=String(text||"").split(/\n/),out=[];let inUl=false,inOl=false;
+  const close=()=>{if(inUl){out.push("</ul>");inUl=false}if(inOl){out.push("</ol>");inOl=false}};
+  for(const raw of lines){
+    const line=raw.trim();
+    if(!line){close();out.push("<p><br></p>");continue}
+    if(/^#{1,3}\s+/.test(line)){close();const n=Math.min(3,(line.match(/^#+/)||[""])[0].length);out.push(`<h${n}>${escHtmlText(line.replace(/^#{1,3}\s+/,""))}</h${n}>`);continue}
+    if(/^\d+[.)]\s+/.test(line)){if(inUl){out.push("</ul>");inUl=false}if(!inOl){out.push("<ol>");inOl=true}out.push("<li>"+escHtmlText(line.replace(/^\d+[.)]\s+/,""))+"</li>");continue}
+    if(/^[-•*]\s+/.test(line)){if(inOl){out.push("</ol>");inOl=false}if(!inUl){out.push("<ul>");inUl=true}out.push("<li>"+escHtmlText(line.replace(/^[-•*]\s+/,""))+"</li>");continue}
+    close();out.push("<p>"+escHtmlText(line)+"</p>");
+  }
+  close();return out.join("");
+}
+function renderFinalDocument(){
+  const p=project(),ed=$("finalDocEditor"),title=$("finalDocTitle");
+  if(!ed||!title)return;
+  title.value=p.finalDocTitle||"Dossier final";
+  ed.innerHTML=p.finalDocHtml||plainTextToHtml(p.masterDossier||"")||"<h1>Dossier final</h1><p>Le Chef peut créer ici le document final du projet.</p>";
+  $("finalDocStatus").textContent=p.finalDocHtml?"Enregistré localement":"Prêt à être créé";
+}
+function saveFinalDocument(){
+  const p=project();p.finalDocTitle=$("finalDocTitle").value.trim()||"Dossier final";p.finalDocHtml=$("finalDocEditor").innerHTML;save();
+  $("finalDocStatus").textContent="Enregistré ✓";setTimeout(()=>{$("finalDocStatus").textContent="Enregistré localement"},1200);
+}
+async function generateFinalDocument(){
+  const p=project(),source=[p.masterDossier||"",project()?.runs?.slice(-1)[0]?.final_report||"",projectContext()].filter(Boolean).join("\n\n").slice(0,15000);
+  if(!source.trim()){$("finalDocStatus").textContent="Aucune matière à transformer en document.";return}
+  $("finalDocStatus").textContent="Le Chef rédige le document final…";
+  try{
+    const out=await llm(
+      AGENTS.coordinator.role+" Tu rédiges un document final professionnel, clair, crédible et présentable. Structure avec titres et sous-titres. N’invente rien.",
+      `CONTENU DU PROJET:\n${source}\n\nRédige maintenant le document final complet. Utilise des titres Markdown # et ##, des listes quand utile, et une rédaction propre prête à être présentée.`,
+      1400
+    );
+    p.finalDocTitle=p.finalDocTitle||"Dossier final";
+    p.finalDocHtml=plainTextToHtml(out);
+    save();renderFinalDocument();$("finalDocStatus").textContent="✓ Document créé par le Chef";
+    addMessage("coordinator","user","J’ai créé le document final. Tu peux maintenant le modifier directement dans l’éditeur puis l’exporter en Word ou PDF.","direct");renderChats();
+  }catch(e){$("finalDocStatus").textContent="Erreur pendant la création : "+(e?.message||e)}
+}
+function downloadWordDocument(){
+  saveFinalDocument();const p=project(),title=p.finalDocTitle||"Dossier final";
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;line-height:1.5;margin:50px;color:#111}h1{font-size:28px}h2{font-size:20px;margin-top:24px}p{margin:0 0 10px}li{margin:4px 0}</style></head><body><h1>${esc(title)}</h1>${p.finalDocHtml||""}</body></html>`;
+  const blob=new Blob([html],{type:"application/msword"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=title.replace(/[^a-z0-9_-]+/gi,"-")+".doc";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+}
+function downloadPdfDocument(){
+  saveFinalDocument();const p=project(),node=$("finalDocEditor").cloneNode(true),wrap=document.createElement("div");
+  wrap.style.background="white";wrap.style.color="#111";wrap.style.padding="32px";wrap.appendChild(node);node.style.boxShadow="none";node.style.margin="0 auto";node.style.minHeight="auto";
+  if(window.html2pdf){
+    window.html2pdf().set({margin:10,filename:(p.finalDocTitle||"Dossier-final").replace(/[^a-z0-9_-]+/gi,"-")+".pdf",image:{type:"jpeg",quality:.98},html2canvas:{scale:2},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}}).from(wrap).save();
+  }else{
+    const w=window.open("","_blank");w.document.write("<html><body>"+wrap.innerHTML+"</body></html>");w.document.close();w.print();
+  }
+}
 function renderReport(){const r=project().runs||[];$("reportText").textContent=r[r.length-1]?.final_report||"Aucun rapport pour ce projet."}
-function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderReport();renderNotifications()}
+function renderAll(){renderProjects();renderRoom();renderDetail();renderActivity();renderChats();renderConversationModal();renderProjectFiles();renderMasterDossier();renderFinalDocument();renderReport();renderNotifications()}
 
 const OLLAMA_URL="http://127.0.0.1:11434";
 async function checkOllama(){
@@ -538,7 +595,7 @@ async function runMission(){
     setA(run,"verifier",{status:"working",task:"Consolide le rapport final",progress:25,started_at:now()});
     const final=await llm(AGENTS.verifier.role,`MISSION:\n${goal}\n\nMÉMOIRE ET FICHIERS:\n${memory()||"Aucune"}\n\nANALYSES:\n${pack}\n\nCRITIQUE:\n${crit}\n\nRédige un rapport clair avec RÉPONSE, CHIFFRES/HYPOTHÈSES, PROBLÈMES À CORRIGER, DÉCISIONS POUR FABIEN, PROCHAINE ACTION.`,850);
     setA(run,"verifier",{status:"done",progress:100,output:final,finished_at:now()});addMessage("verifier","coordinator","Rapport final terminé et prêt pour Fabien.","internal");
-    run.final_report=final;run.status="done";save();addActivity("rapport final terminé","verifier");addMessage("coordinator","user","L’équipe a terminé la mission. Le rapport final est prêt plus bas sur la page.","direct");renderAll();
+    run.final_report=final;run.status="done";if(!project().finalDocHtml)project().finalDocHtml=plainTextToHtml(final);save();addActivity("rapport final terminé","verifier");addMessage("coordinator","user","L’équipe a terminé la mission. J’ai aussi placé le résultat dans le Document final, que tu peux modifier et exporter en Word ou PDF.","direct");renderAll();
   }catch(e){
     const info=humanError(e);
     for(const a of run.agents||[]){
@@ -599,13 +656,21 @@ $("folderInput").onchange=e=>processFolderWithChief(e.target.files);
 $("buildMasterDossier").onclick=buildMasterDossier;
 $("downloadMasterDossier").onclick=downloadMasterDossier;
 $("attachChat").onclick=()=>$("fileInput").click();
-$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],folderBriefs:[],masterDossier:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
+$("newProject").onclick=()=>{const name=prompt("Nom du nouveau projet :");if(!name)return;const description=prompt("Petite description :")||"Projet local",id=name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||uid();db.projects.push({id,name,description,memory:"",files:[],folderBriefs:[],masterDossier:"",finalDocTitle:"Dossier final",finalDocHtml:"",created_at:now(),runs:[],messages:[],activity:[]});selectProject(id)};
 $("sendDirect").onclick=()=>sendDirect("directInput");$("directInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("directInput")}});$("conversationSend").onclick=()=>sendDirect("conversationInput");$("conversationInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendDirect("conversationInput")}});
 $("talkFocus").onclick=()=>{$("directPanel").scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>$("directInput").focus(),350)};
 $("historyFocus").onclick=()=>openConversation();$("networkFilter").onchange=renderChats;
 document.querySelectorAll("[data-open-chat]").forEach(b=>b.onclick=openConversation);
 $("closeConversation").onclick=()=>$("conversationModal").classList.add("hidden");$("conversationModal").onclick=e=>{if(e.target===$("conversationModal"))$("conversationModal").classList.add("hidden")};
 $("copyReport").onclick=async()=>{try{await navigator.clipboard.writeText($("reportText").textContent);$("copyReport").textContent="Copié ✓";setTimeout(()=>$("copyReport").textContent="Copier",1200)}catch{}};
+$("generateFinalDoc").onclick=generateFinalDocument;
+$("saveFinalDoc").onclick=saveFinalDocument;
+$("downloadWord").onclick=downloadWordDocument;
+$("downloadPdf").onclick=downloadPdfDocument;
+$("finalDocTitle").addEventListener("input",()=>{$("finalDocStatus").textContent="Modifications non enregistrées"});
+$("finalDocEditor").addEventListener("input",()=>{$("finalDocStatus").textContent="Modifications non enregistrées"});
+document.querySelectorAll("[data-editor-cmd]").forEach(b=>b.onclick=()=>{document.execCommand(b.dataset.editorCmd,false,b.dataset.editorValue||null);$("finalDocEditor").focus();$("finalDocStatus").textContent="Modifications non enregistrées"});
+
 $("optimizerBtn").onclick=()=>{$("optimizerModal").classList.remove("hidden");renderOptimizerChat();$("optimizerInput").focus()};
 $("closeOptimizer").onclick=()=>$("optimizerModal").classList.add("hidden");$("optimizerModal").onclick=e=>{if(e.target===$("optimizerModal"))$("optimizerModal").classList.add("hidden")};
 document.querySelectorAll(".optQuick").forEach(b=>b.onclick=()=>{$("optimizerInput").value=b.dataset.opt;runOptimizer()});
