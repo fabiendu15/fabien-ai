@@ -176,3 +176,21 @@
 .resumeKey{display:inline-grid;place-items:center;margin-left:6px;min-width:19px;height:19px;border-radius:6px;background:#173b32;color:#8ff0cb;font-size:10px}
 .resumeInfo{margin-top:8px;border:1px solid #70551e;background:#241d0c;color:#f4dfa0;border-radius:10px;padding:10px 12px;font-size:11px}
 .resumeInfo button{margin-left:8px;border:1px solid #806627;background:#322812;color:#ffe9a6;border-radius:8px;padding:6px 8px;font-weight:800}
+
+
+/* v2.8 recherche Internet */
+.webResearchSetup{margin:0 0 12px;padding:12px 14px;border:1px solid #1f3a55;border-radius:12px;background:#081421}
+.webResearchIntro{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.webResearchIntro>div{display:flex;flex-direction:column;gap:2px}.webResearchIntro span{font-size:10px;color:#8fa8bf}
+.webResearchBadge{border-radius:999px;padding:5px 8px;font-size:9px;font-weight:800;border:1px solid #3a5167}
+.webResearchBadge.on{color:#8ff0cb;border-color:#296d55;background:#0d2a23}.webResearchBadge.off{color:#f2b6bf;border-color:#69313a;background:#271116}
+.webResearchControls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.webResearchControls input{min-width:270px;flex:1;background:#07111d;color:#e7f1fb;border:1px solid #28445f;border-radius:9px;padding:9px 10px}
+.webKeyLink{font-size:10px;color:#78baff;text-decoration:none}.webKeyLink:hover{text-decoration:underline}
+.webResearchPanel{margin-top:12px}.webResearchSources{display:grid;gap:8px;margin-top:10px}
+.webSource{border:1px solid #1f3b57;border-radius:10px;background:#081421;padding:10px}
+.webSourceTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.webSource a{color:#8fc5ff;text-decoration:none;font-size:11px;font-weight:800}.webSource a:hover{text-decoration:underline}
+.webSource .sourceDomain{font-size:9px;color:#6f8aa4;white-space:nowrap}.webSource p{margin:6px 0 0;color:#b7c8d8;font-size:10.5px;line-height:1.45}
+.webSourceQuery{font-size:9px;color:#7292ad;margin-top:5px}
+@media(max-width:760px){.webResearchIntro{align-items:flex-start}.webResearchControls input{min-width:100%;width:100%}}
