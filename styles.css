@@ -194,3 +194,14 @@
 .webSource .sourceDomain{font-size:9px;color:#6f8aa4;white-space:nowrap}.webSource p{margin:6px 0 0;color:#b7c8d8;font-size:10.5px;line-height:1.45}
 .webSourceQuery{font-size:9px;color:#7292ad;margin-top:5px}
 @media(max-width:760px){.webResearchIntro{align-items:flex-start}.webResearchControls input{min-width:100%;width:100%}}
+
+
+/* v3.0 mémoire Web */
+.webMemoryHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid #1e3550}
+.webMemoryList{display:grid;gap:8px;margin-top:10px}
+.webMemoryItem{border:1px solid #29425d;border-radius:10px;background:#091522;padding:10px}
+.webMemoryTop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.webMemoryCategory{font-size:9px;font-weight:800;color:#9dd6ff;background:#10243a;border:1px solid #294c6f;border-radius:999px;padding:4px 7px}
+.webMemoryTop button{border:0;background:transparent;color:#7890a8;font-size:16px;cursor:pointer}.webMemoryTop button:hover{color:#ff7788}
+.webMemoryFact{margin-top:7px;color:#d6e2ee;font-size:10.5px;line-height:1.45}
+.webMemoryItem a{display:inline-block;margin-top:6px;color:#7fb9ff;font-size:9.5px;text-decoration:none}.webMemoryItem a:hover{text-decoration:underline}
